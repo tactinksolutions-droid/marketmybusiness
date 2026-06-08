@@ -17,10 +17,22 @@ CREATE TABLE IF NOT EXISTS businesses (
   whatsapp_connected BOOLEAN DEFAULT FALSE,
   gmb_connected BOOLEAN DEFAULT FALSE,
   instagram_connected BOOLEAN DEFAULT FALSE,
+  facebook_connected BOOLEAN DEFAULT FALSE,
+  youtube_connected BOOLEAN DEFAULT FALSE,
+  linkedin_connected BOOLEAN DEFAULT FALSE,
+  google_ads_connected BOOLEAN DEFAULT FALSE,
+  gsc_connected BOOLEAN DEFAULT FALSE,
   onboarding_complete BOOLEAN DEFAULT FALSE,
   monthly_ad_budget INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Channel columns added after initial release (idempotent for existing databases)
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS facebook_connected BOOLEAN DEFAULT FALSE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS youtube_connected BOOLEAN DEFAULT FALSE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS linkedin_connected BOOLEAN DEFAULT FALSE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS google_ads_connected BOOLEAN DEFAULT FALSE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gsc_connected BOOLEAN DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS contacts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

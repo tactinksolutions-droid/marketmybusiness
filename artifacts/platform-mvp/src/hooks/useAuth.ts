@@ -16,6 +16,11 @@ export interface Business {
   whatsapp_connected?: boolean;
   gmb_connected?: boolean;
   instagram_connected?: boolean;
+  facebook_connected?: boolean;
+  youtube_connected?: boolean;
+  linkedin_connected?: boolean;
+  google_ads_connected?: boolean;
+  gsc_connected?: boolean;
   onboarding_complete?: boolean;
 }
 

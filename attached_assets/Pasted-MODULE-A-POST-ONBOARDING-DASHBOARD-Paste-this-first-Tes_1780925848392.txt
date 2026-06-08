@@ -1,0 +1,1141 @@
+MODULE A — POST-ONBOARDING DASHBOARD
+Paste this first. Test it. Then move to Module B.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Add a post-onboarding "Get Started" screen to the existing React app.
+After a business completes onboarding, instead of going directly to
+the chat, show a clean setup screen that guides them to connect their
+first channel. This replaces the blank chat state for new users.
+=== ADD this new component: client/src/components/Setup/SetupScreen.jsx ===
+jsximport React, { useState } from 'react';
+import api from '../../lib/api';
+
+const channels = [
+  {
+    id: 'whatsapp',
+    name: 'WhatsApp Business',
+    icon: '💬',
+    description: 'Send campaigns to your customers directly on WhatsApp',
+    priority: 'Most impactful — connect first',
+    color: 'green',
+    available: true
+  },
+  {
+    id: 'instagram',
+    name: 'Instagram',
+    icon: '📸',
+    description: 'Schedule posts, reels, and stories. Capture leads from ads.',
+    priority: 'High impact for visual brands',
+    color: 'pink',
+    available: true
+  },
+  {
+    id: 'gmb',
+    name: 'Google My Business',
+    icon: '📍',
+    description: 'Post updates, respond to reviews, attract local customers',
+    priority: 'Critical for local discovery',
+    color: 'blue',
+    available: true
+  },
+  {
+    id: 'facebook',
+    name: 'Facebook Pages',
+    icon: '👥',
+    description: 'Schedule posts and run lead generation ads',
+    priority: 'Good for community building',
+    color: 'indigo',
+    available: true
+  },
+  {
+    id: 'youtube',
+    name: 'YouTube',
+    icon: '▶️',
+    description: 'Publish videos, manage channel, track performance',
+    priority: 'Coming soon',
+    color: 'red',
+    available: false
+  },
+  {
+    id: 'linkedin',
+    name: 'LinkedIn',
+    icon: '💼',
+    description: 'Post content and generate B2B leads',
+    priority: 'Coming soon',
+    color: 'blue',
+    available: false
+  },
+  {
+    id: 'google_ads',
+    name: 'Google Ads',
+    icon: '🎯',
+    description: 'Create and manage search and display campaigns',
+    priority: 'Available on Growth plan',
+    color: 'yellow',
+    available: false
+  },
+  {
+    id: 'google_search_console',
+    name: 'Search Console',
+    icon: '🔍',
+    description: 'Monitor website search performance and keywords',
+    priority: 'Available on Growth plan',
+    color: 'green',
+    available: false
+  }
+];
+
+export default function SetupScreen({ business, onComplete }) {
+  const [connecting, setConnecting] = useState(null);
+  const [connected, setConnected] = useState({
+    whatsapp: business?.whatsapp_connected,
+    gmb: business?.gmb_connected,
+    instagram: business?.instagram_connected,
+    facebook: business?.facebook_connected
+  });
+
+  async function handleConnect(channelId) {
+    if (connecting) return;
+    setConnecting(channelId);
+    try {
+      await api.post(`/business/connect/${channelId}`);
+      setConnected(prev => ({ ...prev, [channelId]: true }));
+    } catch (err) {
+      console.error('Connect error:', err);
+    } finally {
+      setConnecting(null);
+    }
+  }
+
+  const connectedCount = Object.values(connected).filter(Boolean).length;
+  const canProceed = connectedCount >= 1;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-white px-4 py-10">
+      <div className="max-w-2xl mx-auto">
+
+        {/* Header */}
+        <div className="text-center mb-10">
+          <div className="text-4xl mb-3">🌿</div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+            Welcome, {business?.name}
+          </h1>
+          <p className="text-gray-500 text-sm max-w-md mx-auto">
+            Connect your marketing channels so your AI assistant can start working.
+            You can add more channels anytime from settings.
+          </p>
+          {connectedCount > 0 && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-green-100 text-green-700 text-sm px-4 py-1.5 rounded-full">
+              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              {connectedCount} channel{connectedCount > 1 ? 's' : ''} connected
+            </div>
+          )}
+        </div>
+
+        {/* Channel grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+          {channels.map(ch => {
+            const isConnected = connected[ch.id];
+            const isConnecting = connecting === ch.id;
+
+            return (
+              <div key={ch.id}
+                className={`bg-white rounded-2xl border p-4 transition-all
+                  ${isConnected ? 'border-green-300 bg-green-50' : 'border-gray-200'}
+                  ${!ch.available ? 'opacity-50' : ''}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">{ch.icon}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{ch.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{ch.description}</p>
+                      <p className={`text-xs mt-1.5 font-medium
+                        ${isConnected ? 'text-green-600' :
+                          ch.available ? 'text-amber-600' : 'text-gray-400'}`}>
+                        {isConnected ? '✓ Connected' : ch.priority}
+                      </p>
+                    </div>
+                  </div>
+                  {ch.available && !isConnected && (
+                    <button
+                      onClick={() => handleConnect(ch.id)}
+                      disabled={isConnecting}
+                      className="flex-shrink-0 bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors">
+                      {isConnecting ? '...' : 'Connect'}
+                    </button>
+                  )}
+                  {isConnected && (
+                    <span className="flex-shrink-0 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">✓</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Digital media section */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
+          <p className="text-sm font-semibold text-gray-900 mb-3">📊 Analytics & Digital Media</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { name: 'Google Analytics', status: 'Connect via URL', id: 'google_analytics' },
+              { name: 'Google Search Console', status: 'Growth plan', id: 'gsc' },
+              { name: 'Google Ads', status: 'Growth plan', id: 'google_ads' },
+              { name: 'Meta Ads Manager', status: 'Growth plan', id: 'meta_ads' },
+            ].map(item => (
+              <div key={item.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-gray-50">
+                <span className="text-xs font-medium text-gray-700">{item.name}</span>
+                <span className="ml-auto text-xs text-gray-400">{item.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="text-center">
+          <button
+            onClick={onComplete}
+            disabled={!canProceed}
+            className="bg-green-700 text-white px-8 py-3 rounded-xl text-sm font-medium hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            {canProceed ? 'Start using MarketMyBusiness →' : 'Connect at least one channel to continue'}
+          </button>
+          <button onClick={onComplete} className="block mx-auto mt-3 text-xs text-gray-400 hover:text-gray-600">
+            Skip for now — I'll connect channels later
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+=== UPDATE client/src/pages/ChatPage.jsx ===
+Import SetupScreen and show it when business is freshly onboarded
+with zero channels connected:
+jsximport React, { useState } from 'react';
+import Sidebar from '../components/Sidebar/Sidebar';
+import ChatWindow from '../components/Chat/ChatWindow';
+import SetupScreen from '../components/Setup/SetupScreen';
+
+export default function ChatPage({ business }) {
+  const noChannels = business && 
+    !business.whatsapp_connected && 
+    !business.gmb_connected && 
+    !business.instagram_connected;
+
+  const [showSetup, setShowSetup] = useState(noChannels);
+
+  if (showSetup) {
+    return <SetupScreen business={business} onComplete={() => setShowSetup(false)} />;
+  }
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar business={business} />
+      <main className="flex-1 flex flex-col min-w-0">
+        <header className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center gap-3">
+          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-lg">🌿</div>
+          <div>
+            <p className="text-sm font--semibold text-gray-900">{business?.name || 'MarketMyBusiness'}</p>
+            <p className="text-xs text-green-600 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse"></span>
+              AI assistant ready
+            </p>
+          </div>
+          <div className="ml-auto text-xs text-gray-400">marketmybusiness.in</div>
+        </header>
+        <div className="flex-1 overflow-hidden bg-white">
+          <ChatWindow business={business} />
+        </div>
+      </main>
+    </div>
+  );
+}
+=== UPDATE server/routes/business.js ===
+Add facebook as a valid platform and add a channel status endpoint:
+javascriptimport express from 'express';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const router = express.Router();
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+router.get('/me', async (req, res) => {
+  res.json({ business: req.tenant });
+});
+
+// Channel connect — simulated for MVP, real OAuth in Phase 2
+router.post('/connect/:platform', async (req, res) => {
+  const { platform } = req.params;
+  const validPlatforms = ['whatsapp', 'gmb', 'instagram', 'facebook'];
+  if (!validPlatforms.includes(platform)) {
+    return res.status(400).json({ error: 'Invalid platform' });
+  }
+  const field = `${platform}_connected`;
+  const { data } = await db.from('businesses')
+    .update({ [field]: true })
+    .eq('id', req.tenant.id)
+    .select().single();
+  res.json({ success: true, platform, business: data });
+});
+
+// Channel disconnect
+router.post('/disconnect/:platform', async (req, res) => {
+  const { platform } = req.params;
+  const validPlatforms = ['whatsapp', 'gmb', 'instagram', 'facebook'];
+  if (!validPlatforms.includes(platform)) {
+    return res.status(400).json({ error: 'Invalid platform' });
+  }
+  const field = `${platform}_connected`;
+  await db.from('businesses').update({ [field]: false }).eq('id', req.tenant.id);
+  res.json({ success: true, platform, connected: false });
+});
+
+// Full channel status
+router.get('/channels', async (req, res) => {
+  const b = req.tenant;
+  res.json({
+    channels: {
+      whatsapp: { connected: b?.whatsapp_connected || false, label: 'WhatsApp Business' },
+      instagram: { connected: b?.instagram_connected || false, label: 'Instagram' },
+      gmb: { connected: b?.gmb_connected || false, label: 'Google My Business' },
+      facebook: { connected: b?.facebook_connected || false, label: 'Facebook Pages' }
+    }
+  });
+});
+
+router.patch('/me', async (req, res) => {
+  const allowed = ['language', 'brand_tone', 'brand_color', 'monthly_ad_budget', 'website_url'];
+  const updates = Object.fromEntries(
+    Object.entries(req.body).filter(([k]) => allowed.includes(k))
+  );
+  const { data } = await db.from('businesses').update(updates)
+    .eq('id', req.tenant.id).select().single();
+  res.json({ business: data });
+});
+
+export default router;
+=== UPDATE supabase/schema.sql — ADD this to your existing schema ===
+Run this in Supabase SQL Editor to add facebook_connected column:
+sqlALTER TABLE businesses ADD COLUMN IF NOT EXISTS facebook_connected BOOLEAN DEFAULT FALSE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS youtube_connected BOOLEAN DEFAULT FALSE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS linkedin_connected BOOLEAN DEFAULT FALSE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS google_ads_connected BOOLEAN DEFAULT FALSE;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gsc_connected BOOLEAN DEFAULT FALSE;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE B — CHANNEL SETTINGS PAGE
+Paste after Module A is working.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Add a Settings page accessible from the sidebar where business owners
+can manage all channel connections, update business details, and see
+their current plan.
+=== ADD client/src/pages/SettingsPage.jsx ===
+jsximport React, { useState, useEffect } from 'react';
+import api from '../lib/api';
+
+const socialChannels = [
+  { id: 'whatsapp', name: 'WhatsApp Business', icon: '💬', desc: 'Send campaigns and automated messages', field: 'whatsapp_connected', tier: 'starter' },
+  { id: 'instagram', name: 'Instagram', icon: '📸', desc: 'Posts, reels, stories, lead ads', field: 'instagram_connected', tier: 'starter' },
+  { id: 'gmb', name: 'Google My Business', icon: '📍', desc: 'Local SEO, posts, review management', field: 'gmb_connected', tier: 'starter' },
+  { id: 'facebook', name: 'Facebook Pages', icon: '👥', desc: 'Page posts and lead generation', field: 'facebook_connected', tier: 'starter' },
+  { id: 'youtube', name: 'YouTube', icon: '▶️', desc: 'Video publishing and analytics', field: 'youtube_connected', tier: 'growth' },
+  { id: 'linkedin', name: 'LinkedIn', icon: '💼', desc: 'B2B content and lead generation', field: 'linkedin_connected', tier: 'growth' },
+];
+
+const digitalChannels = [
+  { id: 'google_ads', name: 'Google Ads', icon: '🎯', desc: 'Search and display campaign management', field: 'google_ads_connected', tier: 'growth' },
+  { id: 'gsc', name: 'Google Search Console', icon: '🔍', desc: 'Website search performance and keywords', field: 'gsc_connected', tier: 'growth' },
+  { id: 'meta_ads', name: 'Meta Ads Manager', icon: '📣', desc: 'Facebook and Instagram paid campaigns', field: 'meta_ads_connected', tier: 'growth' },
+  { id: 'google_analytics', name: 'Google Analytics', icon: '📊', desc: 'Website traffic and conversion tracking', field: 'ga_connected', tier: 'growth' },
+];
+
+function ChannelRow({ channel, connected, plan, onToggle, connecting }) {
+  const isLocked = channel.tier === 'growth' && plan === 'starter';
+  const isConnecting = connecting === channel.id;
+
+  return (
+    <div className={`flex items-center gap-4 py-4 border-b border-gray-100 last:border-0 ${isLocked ? 'opacity-50' : ''}`}>
+      <span className="text-2xl w-8 text-center">{channel.icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-gray-900">{channel.name}</p>
+          {isLocked && (
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Growth plan</span>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mt-0.5">{channel.desc}</p>
+      </div>
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {connected && !isLocked && (
+          <span className="text-xs text-green-600 font-medium">Connected</span>
+        )}
+        <button
+          onClick={() => !isLocked && onToggle(channel.id, !connected)}
+          disabled={isLocked || isConnecting}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+            ${connected && !isLocked ? 'bg-green-600' : 'bg-gray-200'}
+            ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform
+            ${connected && !isLocked ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function SettingsPage({ business, onBack }) {
+  const [channels, setChannels] = useState({
+    whatsapp: business?.whatsapp_connected,
+    instagram: business?.instagram_connected,
+    gmb: business?.gmb_connected,
+    facebook: business?.facebook_connected,
+    youtube: false,
+    linkedin: false,
+    google_ads: false,
+    gsc: false,
+  });
+  const [connecting, setConnecting] = useState(null);
+  const [businessData, setBusinessData] = useState(business);
+  const [saved, setSaved] = useState(false);
+
+  async function toggleChannel(channelId, newState) {
+    setConnecting(channelId);
+    try {
+      if (newState) {
+        await api.post(`/business/connect/${channelId}`);
+      } else {
+        await api.post(`/business/disconnect/${channelId}`);
+      }
+      setChannels(prev => ({ ...prev, [channelId]: newState }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setConnecting(null);
+    }
+  }
+
+  async function saveDetails(e) {
+    e.preventDefault();
+    const form = e.target;
+    await api.patch('/business/me', {
+      language: form.language.value,
+      brand_tone: form.brand_tone.value,
+      website_url: form.website_url.value,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="max-w-2xl mx-auto px-6 py-8">
+
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-8">
+          <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm flex items-center gap-1">
+            ← Back
+          </button>
+          <h1 className="text-lg font-semibold text-gray-900">Settings</h1>
+        </div>
+
+        {/* Business details */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">Business details</h2>
+          <form onSubmit={saveDetails} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Business name</label>
+              <input defaultValue={businessData?.name} disabled
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 text-gray-500" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Language</label>
+                <select name="language" defaultValue={businessData?.language || 'English'}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+                  {['English','Hindi','Kannada','Tamil','Telugu','Gujarati','Marathi'].map(l => (
+                    <option key={l}>{l}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Brand tone</label>
+                <select name="brand_tone" defaultValue={businessData?.brand_tone || 'professional'}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+                  {['calm, warm, mindful','friendly, casual','professional, corporate','fun, energetic','luxury, premium'].map(t => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Website URL</label>
+              <input name="website_url" defaultValue={businessData?.website_url}
+                placeholder="https://yourwebsite.com"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+            </div>
+            <button type="submit"
+              className="bg-green-700 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-green-800 transition-colors">
+              {saved ? '✓ Saved' : 'Save changes'}
+            </button>
+          </form>
+        </div>
+
+        {/* Social channels */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-gray-900">Social media channels</h2>
+            <span className="text-xs text-gray-400">Starter plan</span>
+          </div>
+          <p className="text-xs text-gray-500 mb-4">Connect channels to enable AI-powered campaign creation and scheduling</p>
+          {socialChannels.map(ch => (
+            <ChannelRow key={ch.id} channel={ch}
+              connected={channels[ch.id]}
+              plan={businessData?.plan || 'starter'}
+              onToggle={toggleChannel}
+              connecting={connecting} />
+          ))}
+        </div>
+
+        {/* Digital media */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-gray-900">Digital media & analytics</h2>
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Growth plan</span>
+          </div>
+          <p className="text-xs text-gray-500 mb-4">Ads management, search console, and deep analytics. Upgrade to Growth to unlock.</p>
+          {digitalChannels.map(ch => (
+            <ChannelRow key={ch.id} channel={ch}
+              connected={channels[ch.id]}
+              plan={businessData?.plan || 'starter'}
+              onToggle={toggleChannel}
+              connecting={connecting} />
+          ))}
+        </div>
+
+        {/* Plan */}
+        <div className="bg-green-50 rounded-2xl border border-green-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 capitalize">{businessData?.plan || 'Starter'} Plan</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {businessData?.plan === 'starter' ? 'Upgrade to Growth to unlock Google Ads, Meta Ads, Analytics, and more.' : 'All features unlocked.'}
+              </p>
+            </div>
+            {businessData?.plan === 'starter' && (
+              <button className="bg-green-700 text-white text-xs font-medium px-4 py-2 rounded-xl hover:bg-green-800 transition-colors">
+                Upgrade to Growth
+              </button>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+=== UPDATE client/src/components/Sidebar/Sidebar.jsx ===
+Add Settings navigation and pass onSettings prop:
+jsximport React from 'react';
+import { supabase } from '../../lib/supabase';
+
+export default function Sidebar({ business, currentPage, onNavigate }) {
+  const nav = [
+    { icon: '💬', label: 'Chat', page: 'chat' },
+    { icon: '👥', label: 'Contacts', page: 'contacts' },
+    { icon: '📣', label: 'Campaigns', page: 'campaigns' },
+    { icon: '⭐', label: 'Reviews', page: 'reviews' },
+    { icon: '📊', label: 'Analytics', page: 'analytics' },
+    { icon: '⚙️', label: 'Settings', page: 'settings' },
+  ];
+
+  return (
+    <aside className="w-52 bg-white border-r border-gray-100 flex flex-col">
+      <div className="px-4 py-5 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-lg">🌿</div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{business?.name || 'My Business'}</p>
+            <p className="text-xs text-gray-400 capitalize">{business?.plan || 'starter'}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-3 py-3 border-b border-gray-100">
+        <p className="text-xs text-gray-400 px-2 mb-2 font-medium uppercase tracking-wide">Channels</p>
+        {[
+          { label: 'WhatsApp', connected: business?.whatsapp_connected },
+          { label: 'Google My Business', connected: business?.gmb_connected },
+          { label: 'Instagram', connected: business?.instagram_connected },
+          { label: 'Facebook', connected: business?.facebook_connected },
+        ].map(ch => (
+          <div key={ch.label} className="flex items-center gap-2 px-2 py-1">
+            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ch.connected ? 'bg-green-500' : 'bg-gray-200'}`} />
+            <span className="text-xs text-gray-500 truncate">{ch.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <nav className="flex-1 px-3 py-3 space-y-0.5">
+        {nav.map(item => (
+          <button key={item.label}
+            onClick={() => onNavigate(item.page)}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors
+              ${currentPage === item.page ? 'bg-green-50 text-green-800 font-medium' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <span className="text-base">{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="px-4 py-4 border-t border-gray-100">
+        <div className="flex items-center gap-2 px-1 mb-3">
+          <div className="w-7 h-7 rounded-full bg-green-700 flex items-center justify-center text-white text-xs font-bold">
+            {business?.name?.[0] || 'M'}
+          </div>
+          <span className="text-xs text-gray-500 truncate">{business?.city}</span>
+        </div>
+        <button onClick={() => supabase.auth.signOut()}
+          className="w-full text-left text-xs text-gray-400 hover:text-gray-600 px-1">
+          Sign out
+        </button>
+      </div>
+    </aside>
+  );
+}
+=== UPDATE client/src/pages/ChatPage.jsx AGAIN ===
+Add routing between Chat and Settings:
+jsximport React, { useState } from 'react';
+import Sidebar from '../components/Sidebar/Sidebar';
+import ChatWindow from '../components/Chat/ChatWindow';
+import SetupScreen from '../components/Setup/SetupScreen';
+import SettingsPage from './SettingsPage';
+
+export default function ChatPage({ business }) {
+  const noChannels = business &&
+    !business.whatsapp_connected &&
+    !business.gmb_connected &&
+    !business.instagram_connected &&
+    !business.facebook_connected;
+
+  const [showSetup, setShowSetup] = useState(noChannels);
+  const [currentPage, setCurrentPage] = useState('chat');
+
+  if (showSetup) {
+    return <SetupScreen business={business} onComplete={() => setShowSetup(false)} />;
+  }
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar business={business} currentPage={currentPage} onNavigate={setCurrentPage} />
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {currentPage === 'chat' && (
+          <>
+            <header className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center gap-3 flex-shrink-0">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-lg">🌿</div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{business?.name || 'MarketMyBusiness'}</p>
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse"></span>
+                  AI assistant ready
+                </p>
+              </div>
+              <div className="ml-auto text-xs text-gray-400">marketmybusiness.in</div>
+            </header>
+            <div className="flex-1 overflow-hidden bg-white">
+              <ChatWindow business={business} />
+            </div>
+          </>
+        )}
+
+        {currentPage === 'settings' && (
+          <SettingsPage business={business} onBack={() => setCurrentPage('chat')} />
+        )}
+
+        {['contacts', 'campaigns', 'reviews', 'analytics'].includes(currentPage) && (
+          <div className="flex-1 flex items-center justify-center bg-white">
+            <div className="text-center">
+              <p className="text-4xl mb-3">🚧</p>
+              <p className="text-sm font-medium text-gray-700 capitalize">{currentPage}</p>
+              <p className="text-xs text-gray-400 mt-1">Coming in the next build sprint</p>
+              <button onClick={() => setCurrentPage('chat')}
+                className="mt-4 text-xs text-green-600 hover:text-green-800">
+                ← Back to chat
+              </button>
+            </div>
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE C — CONTACTS PAGE
+Paste after Module B is working.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Add a Contacts page with CSV upload, contact listing, and segmentation.
+Replace the "Coming soon" placeholder for the contacts page.
+=== ADD client/src/pages/ContactsPage.jsx ===
+jsximport React, { useState, useEffect, useRef } from 'react';
+import api from '../lib/api';
+
+const SEGMENT_COLORS = {
+  new: 'blue', active: 'green', warm: 'amber', lapsed: 'red'
+};
+
+export default function ContactsPage() {
+  const [contacts, setContacts] = useState([]);
+  const [segments, setSegments] = useState({});
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const fileRef = useRef(null);
+
+  useEffect(() => { loadContacts(); }, []);
+
+  async function loadContacts() {
+    try {
+      const { data } = await api.get('/contacts');
+      setContacts(data.contacts || []);
+      setSegments(data.segments || {});
+      setTotal(data.total || 0);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }
+
+  async function handleFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportResult(null);
+
+    // Parse CSV using simple split (no external library needed for basic CSVs)
+    const text = await file.text();
+    const lines = text.trim().split('\n');
+    const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+
+    const nameIdx = headers.findIndex(h => h.includes('name'));
+    const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('number'));
+    const emailIdx = headers.findIndex(h => h.includes('email'));
+
+    const contacts = lines.slice(1).map(line => {
+      const cols = line.split(',').map(c => c.trim().replace(/"/g, ''));
+      return {
+        name: nameIdx >= 0 ? cols[nameIdx] : '',
+        phone: phoneIdx >= 0 ? cols[phoneIdx] : '',
+        email: emailIdx >= 0 ? cols[emailIdx] : '',
+      };
+    }).filter(c => c.phone || c.email);
+
+    try {
+      const { data } = await api.post('/contacts/import', { contacts });
+      setImportResult({ success: true, count: data.imported });
+      loadContacts();
+    } catch (err) {
+      setImportResult({ success: false, error: 'Import failed. Check your file format.' });
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="max-w-3xl mx-auto px-6 py-8">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">Contacts</h1>
+            <p className="text-xs text-gray-500 mt-0.5">{total} customers in your database</p>
+          </div>
+          <button onClick={() => fileRef.current?.click()}
+            disabled={importing}
+            className="bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-800 disabled:opacity-50 transition-colors">
+            {importing ? 'Importing...' : '+ Import CSV'}
+          </button>
+          <input ref={fileRef} type="file" accept=".csv" onChange={handleFileUpload} hidden />
+        </div>
+
+        {/* Import result */}
+        {importResult && (
+          <div className={`mb-4 px-4 py-3 rounded-xl text-sm
+            ${importResult.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+            {importResult.success ? `✓ Imported ${importResult.count} contacts successfully` : importResult.error}
+          </div>
+        )}
+
+        {/* Segment pills */}
+        {Object.keys(segments).length > 0 && (
+          <div className="flex gap-2 mb-6 flex-wrap">
+            <div className="bg-white border border-gray-200 rounded-full px-4 py-1.5 text-xs font-medium text-gray-700">
+              All ({total})
+            </div>
+            {Object.entries(segments).map(([seg, count]) => (
+              <div key={seg} className="bg-white border border-gray-200 rounded-full px-4 py-1.5 text-xs font-medium text-gray-700 capitalize">
+                {seg} ({count})
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && contacts.length === 0 && (
+          <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
+            <p className="text-3xl mb-3">👥</p>
+            <p className="text-sm font-medium text-gray-700 mb-1">No contacts yet</p>
+            <p className="text-xs text-gray-400 mb-4">Import a CSV with your customer names, phone numbers, and emails</p>
+            <button onClick={() => fileRef.current?.click()}
+              className="bg-green-700 text-white text-sm font-medium px-5 py-2 rounded-xl hover:bg-green-800">
+              Import your first list
+            </button>
+            <p className="text-xs text-gray-400 mt-4">Or just ask the AI: "Upload my customer list"</p>
+          </div>
+        )}
+
+        {/* Contacts list */}
+        {contacts.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="grid grid-cols-4 px-4 py-3 border-b border-gray-100 bg-gray-50">
+              {['Name', 'Phone', 'Email', 'Segment'].map(h => (
+                <p key={h} className="text-xs font-medium text-gray-500">{h}</p>
+              ))}
+            </div>
+            {contacts.slice(0, 50).map(c => (
+              <div key={c.id} className="grid grid-cols-4 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <p className="text-sm text-gray-900 truncate">{c.name || '—'}</p>
+                <p className="text-sm text-gray-600 font-mono truncate">{c.phone || '—'}</p>
+                <p className="text-sm text-gray-600 truncate">{c.email || '—'}</p>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit capitalize
+                  bg-${SEGMENT_COLORS[c.segment] || 'gray'}-100 text-${SEGMENT_COLORS[c.segment] || 'gray'}-700`}>
+                  {c.segment}
+                </span>
+              </div>
+            ))}
+            {contacts.length > 50 && (
+              <div className="px-4 py-3 text-xs text-gray-400 text-center">
+                Showing 50 of {contacts.length} contacts
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CSV format guide */}
+        <div className="mt-6 bg-amber-50 rounded-xl border border-amber-200 p-4">
+          <p className="text-xs font-medium text-amber-800 mb-2">CSV format guide</p>
+          <p className="text-xs text-amber-700 font-mono">name, phone, email, last_contacted</p>
+          <p className="text-xs text-amber-600 mt-1.5">Column headers are auto-detected. Phone and email are enough to get started.</p>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+=== UPDATE ChatPage.jsx — replace the contacts placeholder ===
+Import ContactsPage and render it when currentPage === 'contacts':
+jsximport ContactsPage from './ContactsPage';
+// Inside the return, replace contacts placeholder with:
+{currentPage === 'contacts' && <ContactsPage />}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE D — CAMPAIGNS PAGE
+Paste after Module C is working.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Add a Campaigns page that shows all campaigns — drafts needing approval,
+sent campaigns with stats, and scheduled campaigns pending send.
+=== ADD client/src/pages/CampaignsPage.jsx ===
+jsximport React, { useState, useEffect } from 'react';
+import api from '../lib/api';
+
+const STATUS_CONFIG = {
+  draft: { label: 'Awaiting approval', color: 'amber', icon: '⏳' },
+  approved: { label: 'Approved', color: 'blue', icon: '✓' },
+  sent: { label: 'Sent', color: 'green', icon: '📤' },
+  scheduled: { label: 'Scheduled', color: 'purple', icon: '🕐' },
+};
+
+const CHANNEL_ICONS = {
+  whatsapp: '💬', email: '📧', sms: '📱',
+  instagram: '📸', facebook: '👥', gmb: '📍'
+};
+
+export default function CampaignsPage() {
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+
+  useEffect(() => { loadCampaigns(); }, []);
+
+  async function loadCampaigns() {
+    try {
+      const { data } = await api.get('/campaigns');
+      setCampaigns(data.campaigns || []);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }
+
+  async function approve(id) {
+    await api.post(`/campaigns/${id}/approve`);
+    loadCampaigns();
+  }
+
+  async function deleteCampaign(id) {
+    await api.delete(`/campaigns/${id}`);
+    loadCampaigns();
+  }
+
+  const filtered = filter === 'all' ? campaigns : campaigns.filter(c => c.status === filter);
+  const draftCount = campaigns.filter(c => c.status === 'draft').length;
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="max-w-3xl mx-auto px-6 py-8">
+
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">Campaigns</h1>
+            <p className="text-xs text-gray-500 mt-0.5">{campaigns.length} total · {draftCount} awaiting approval</p>
+          </div>
+          {draftCount > 0 && (
+            <div className="bg-amber-100 text-amber-700 text-xs font-medium px-3 py-1.5 rounded-full">
+              {draftCount} need{draftCount === 1 ? 's' : ''} approval
+            </div>
+          )}
+        </div>
+
+        {/* Filter tabs */}
+        <div className="flex gap-2 mb-5">
+          {['all', 'draft', 'sent', 'scheduled'].map(f => (
+            <button key={f}
+              onClick={() => setFilter(f)}
+              className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors capitalize
+                ${filter === f ? 'bg-green-700 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+              {f === 'all' ? 'All' : STATUS_CONFIG[f]?.label || f}
+            </button>
+          ))}
+        </div>
+
+        {/* Empty state */}
+        {!loading && filtered.length === 0 && (
+          <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
+            <p className="text-3xl mb-3">📣</p>
+            <p className="text-sm font-medium text-gray-700 mb-1">No campaigns yet</p>
+            <p className="text-xs text-gray-400">Go to chat and say "Send a WhatsApp to my customers about [your offer]"</p>
+          </div>
+        )}
+
+        {/* Campaign list */}
+        <div className="space-y-3">
+          {filtered.map(c => {
+            const status = STATUS_CONFIG[c.status] || STATUS_CONFIG.draft;
+            const openRate = c.total_sent > 0 ? Math.round((c.total_read / c.total_sent) * 100) : null;
+
+            return (
+              <div key={c.id} className={`bg-white rounded-2xl border p-4
+                ${c.status === 'draft' ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl">{CHANNEL_ICONS[c.channel] || '📣'}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{c.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-xs font-medium text-${status.color}-600`}>
+                          {status.icon} {status.label}
+                        </span>
+                        <span className="text-xs text-gray-400">·</span>
+                        <span className="text-xs text-gray-400 capitalize">{c.channel}</span>
+                        {c.campaign_type && (
+                          <>
+                            <span className="text-xs text-gray-400">·</span>
+                            <span className="text-xs text-gray-400 capitalize">{c.campaign_type.replace('_', ' ')}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs text-gray-400">
+                      {new Date(c.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Message preview */}
+                <div className="bg-gray-50 rounded-xl px-3 py-2.5 mb-3">
+                  <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{c.message_body}</p>
+                </div>
+
+                {/* Stats for sent campaigns */}
+                {c.status === 'sent' && c.total_sent > 0 && (
+                  <div className="flex gap-4 mb-3">
+                    <div><p className="text-xs text-gray-400">Sent</p><p className="text-sm font-semibold text-gray-900">{c.total_sent}</p></div>
+                    <div><p className="text-xs text-gray-400">Delivered</p><p className="text-sm font-semibold text-gray-900">{c.total_delivered}</p></div>
+                    <div><p className="text-xs text-gray-400">Read</p><p className="text-sm font-semibold text-gray-900">{c.total_read}</p></div>
+                    {openRate !== null && (
+                      <div><p className="text-xs text-gray-400">Open rate</p>
+                        <p className={`text-sm font-semibold ${openRate >= 50 ? 'text-green-600' : 'text-gray-900'}`}>{openRate}%</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Actions */}
+                {c.status === 'draft' && (
+                  <div className="flex gap-2">
+                    <button onClick={() => approve(c.id)}
+                      className="flex-1 bg-green-700 text-white text-xs font-medium py-2 rounded-xl hover:bg-green-800 transition-colors">
+                      Approve & Send
+                    </button>
+                    <button onClick={() => deleteCampaign(c.id)}
+                      className="flex-1 border border-gray-200 text-gray-600 text-xs font-medium py-2 rounded-xl hover:bg-gray-50 transition-colors">
+                      Delete draft
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+=== UPDATE ChatPage.jsx — add CampaignsPage ===
+jsximport CampaignsPage from './CampaignsPage';
+// In the return block, replace campaigns placeholder with:
+{currentPage === 'campaigns' && <CampaignsPage />}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODULE E — ANALYTICS PAGE
+Paste after Module D is working.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Add an Analytics page showing key marketing metrics pulled from
+the database. Simple, clean, numbers-first.
+=== ADD client/src/pages/AnalyticsPage.jsx ===
+jsximport React, { useState, useEffect } from 'react';
+import api from '../lib/api';
+
+function MetricCard({ icon, label, value, sub, highlight }) {
+  return (
+    <div className={`bg-white rounded-2xl border p-4 ${highlight ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xl">{icon}</span>
+        <p className="text-xs text-gray-500 font-medium">{label}</p>
+      </div>
+      <p className={`text-2xl font-semibold ${highlight ? 'text-green-700' : 'text-gray-900'}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+export default function AnalyticsPage() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/analytics/summary')
+      .then(({ data }) => setStats(data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const avgOpenRate = stats?.recentCampaigns?.length > 0
+    ? Math.round(stats.recentCampaigns
+        .filter(c => c.total_sent > 0)
+        .reduce((sum, c) => sum + (c.total_read / c.total_sent) * 100, 0) /
+        Math.max(stats.recentCampaigns.filter(c => c.total_sent > 0).length, 1))
+    : 0;
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="max-w-3xl mx-auto px-6 py-8">
+
+        <div className="mb-6">
+          <h1 className="text-lg font-semibold text-gray-900">Analytics</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Last 30 days overview</p>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12 text-gray-400 text-sm">Loading analytics...</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              <MetricCard icon="👥" label="Total contacts" value={stats?.contacts || 0} sub="In your database" />
+              <MetricCard icon="📣" label="Campaigns sent" value={stats?.campaigns || 0} sub="All time" highlight />
+              <MetricCard icon="📖" label="Avg open rate" value={`${avgOpenRate}%`} sub="Platform avg: 58%" highlight={avgOpenRate >= 58} />
+              <MetricCard icon="⭐" label="GMB posts" value={stats?.gmbPosts || 0} sub="Published" />
+            </div>
+
+            {/* Recent campaigns */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-4">
+              <h2 className="text-sm font-semibold text-gray-900 mb-4">Recent campaigns</h2>
+              {stats?.recentCampaigns?.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">No campaigns yet — ask the AI to create one</p>
+              ) : (
+                <div className="space-y-3">
+                  {stats?.recentCampaigns?.map(c => (
+                    <div key={c.name + c.created_at} className="flex items-center gap-3">
+                      <span className="text-base">{c.channel === 'whatsapp' ? '💬' : '📣'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800 truncate">{c.name}</p>
+                        <p className="text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize
+                          ${c.status === 'sent' ? 'bg-green-100 text-green-700' :
+                            c.status === 'draft' ? 'bg-amber-100 text-amber-700' :
+                            'bg-gray-100 text-gray-600'}`}>
+                          {c.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Upgrade nudge */}
+            <div className="bg-green-50 rounded-2xl border border-green-200 p-5">
+              <p className="text-sm font-semibold text-gray-900 mb-1">🚀 Unlock full analytics</p>
+              <p className="text-xs text-gray-600 mb-3">Upgrade to Growth to see CAC, ROAS, Instagram reach, Google Ads performance, and one-click investor reports.</p>
+              <button className="bg-green-700 text-white text-xs font-medium px-4 py-2 rounded-xl hover:bg-green-800 transition-colors">
+                Upgrade to Growth — ₹2,499/month
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+=== UPDATE ChatPage.jsx — add AnalyticsPage ===
+jsximport AnalyticsPage from './AnalyticsPage';
+{currentPage === 'analytics' && <AnalyticsPage />}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINAL: UPDATE AI SYSTEM PROMPT FOR MMB
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+In server/services/claudeService.js, update the platform name
+references from "GrowIQ" to "MarketMyBusiness" in all prompts.
+Also update the onboarding welcome message:
+Find: "Welcome to GrowIQ!"
+Replace with: "Welcome to MarketMyBusiness! 🌿"
+Find: "Welcome to GrowIQ, ${result.data.owner}!"
+Replace with: "Welcome to MarketMyBusiness, ${result.data.owner}!"
+Find: "marketmybusiness.in" already used in header — no change needed.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TEST CHECKLIST — run after all modules
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Fresh login → onboarding → Setup Screen appears (not blank chat)
+Connect WhatsApp on Setup Screen → turns green → counter shows 1
+Click "Start using MarketMyBusiness" → main app loads
+Sidebar shows WhatsApp as connected (green dot)
+Sidebar Settings → click → Settings page loads
+Toggle Instagram to ON in Settings → turns green → toggle back OFF
+Sidebar Contacts → Contacts page loads with import button
+Import a test CSV (3 rows: name, phone, email) → success message
+Sidebar Campaigns → Campaigns page loads
+Go to Chat → "Send a Diwali offer to my customers"
+→ AI drafts campaign → approval card appears in chat
+Click "Send it" → go to Campaigns page → campaign shows as Sent
+Sidebar Analytics → metrics show (contacts: 3, campaigns: 1)

@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Business } from "../hooks/useAuth";
 import Sidebar from "../components/Sidebar/Sidebar";
 import ChatWindow from "../components/Chat/ChatWindow";
+import SetupScreen from "../components/Setup/SetupScreen";
 import ContactsView from "../components/views/ContactsView";
 import CampaignsView from "../components/views/CampaignsView";
 import ReviewsView from "../components/views/ReviewsView";
@@ -24,6 +25,27 @@ export default function ChatPage({
   refetchBusiness: () => void;
 }) {
   const [view, setView] = useState<View>("Chat");
+
+  const noChannels =
+    !!business &&
+    !business.whatsapp_connected &&
+    !business.gmb_connected &&
+    !business.instagram_connected &&
+    !business.facebook_connected;
+
+  const [showSetup, setShowSetup] = useState(noChannels);
+
+  if (showSetup) {
+    return (
+      <SetupScreen
+        business={business}
+        onComplete={() => {
+          refetchBusiness();
+          setShowSetup(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
