@@ -42,6 +42,7 @@ export default function Sidebar({
           { label: "WhatsApp", connected: business?.whatsapp_connected },
           { label: "Google My Business", connected: business?.gmb_connected },
           { label: "Instagram", connected: business?.instagram_connected },
+          { label: "Facebook", connected: business?.facebook_connected },
         ].map((ch) => (
           <div key={ch.label} className="flex items-center gap-2 px-2 py-1">
             <div
