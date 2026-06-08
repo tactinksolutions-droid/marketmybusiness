@@ -1,0 +1,1 @@
+- [GrowIQ onboarding flow](onboarding-flow.md) — chat onboarding uses client-supplied history (no DB row yet) + a summarize-and-confirm step before saving the profile.

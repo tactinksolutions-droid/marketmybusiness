@@ -154,20 +154,37 @@ export async function onboard(
   history: ChatMessage[],
   message: string
 ): Promise<{ complete: boolean; message?: string; data?: Record<string, string> }> {
-  const system = `You are setting up a new GrowIQ account. Collect through natural conversation:
+  const system = `You are setting up a new GrowIQ account. Collect these 6 things through natural conversation, ONE question at a time:
 1. Business name
 2. Business type (be specific — "wellness brand", "salon", "restaurant" etc)
-3. City and area
+3. City and area (e.g. "Bengaluru, Indiranagar" — city is the city, area/locality is the neighbourhood)
 4. Owner's first name
 5. WhatsApp number
 6. Preferred language (English/Hindi/Kannada/Tamil/Telugu)
 
-Already collected: ${JSON.stringify(history.filter((m) => m.role === "assistant").slice(-1))}
+The full conversation so far is provided in the messages below — read it carefully and track which of the 6 items the user has ALREADY answered. Never re-ask something already answered. Never jump back to question 1.
 
-Rules: One question at a time. Warm and welcoming. First message: "Welcome to GrowIQ! 🌱 I'm going to help set up your account — it takes about 2 minutes. What's the name of your business?"
+Rules:
+- One question at a time. Warm and welcoming.
+- The opening assistant message is already shown to the user, so do not repeat the greeting; just continue from where the conversation left off.
 
-When ALL 6 are collected, respond with ONLY this JSON:
-{"done":true,"name":"...","type":"...","city":"...","locality":"...","owner":"...","phone":"...","language":"..."}`;
+CONFIRMATION STEP — once you believe all 6 are collected, do NOT output JSON yet. First reply with a clear summary for the user to verify, exactly like this:
+
+Perfect! Here's what I've got — please confirm it's all correct:
+
+• Business: <name>
+• Type: <type>
+• Location: <area>, <city>
+• Owner: <owner>
+• WhatsApp: <phone>
+• Language: <language>
+
+Is everything correct? Reply "yes" to finish, or tell me what to change.
+
+Only AFTER the user confirms the summary is correct, respond with ONLY this JSON (no other text):
+{"done":true,"name":"...","type":"...","city":"...","locality":"...","owner":"...","phone":"...","language":"..."}
+
+If the user asks to change something, update it, show the corrected summary again, and ask for confirmation once more.`;
 
   const res = await anthropic.messages.create({
     model: "claude-sonnet-4-5",
@@ -179,9 +196,12 @@ When ALL 6 are collected, respond with ONLY this JSON:
     ],
   });
   const text = res.content[0].type === "text" ? res.content[0].text.trim() : "";
-  try {
-    const parsed = JSON.parse(text);
-    if (parsed.done) return { complete: true, data: parsed };
-  } catch {}
+  const jsonMatch = text.match(/\{[\s\S]*"done"[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.done) return { complete: true, data: parsed };
+    } catch {}
+  }
   return { complete: false, message: text };
 }
