@@ -5,16 +5,27 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    if (!error) setSent(true);
-    setLoading(false);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) {
+        setError(error.message);
+      } else {
+        setSent(true);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -51,6 +62,11 @@ export default function LoginPage() {
             >
               {loading ? "Sending..." : "Continue with email"}
             </button>
+            {error && (
+              <p className="text-center text-xs text-red-600 mt-3 break-words">
+                {error}
+              </p>
+            )}
             <p className="text-center text-xs text-gray-400 mt-4">
               No password needed — we'll send a magic link
             </p>
