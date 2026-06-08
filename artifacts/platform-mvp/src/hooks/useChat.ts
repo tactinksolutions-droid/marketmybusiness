@@ -77,7 +77,10 @@ export function useChat(business: Business | null) {
       setMessages((p) => [...p, userMsg]);
       setLoading(true);
       try {
-        const { data } = await api.post("/chat", { message: text });
+        const { data } = await api.post("/chat", {
+        message: text,
+        history: messages.map((m) => ({ role: m.role, content: m.content })),
+      });
         setMessages((p) => [
           ...p,
           {

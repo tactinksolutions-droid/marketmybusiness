@@ -14,14 +14,12 @@ router.post("/", tenantMiddleware, async (req: any, res) => {
 
   try {
     if (!req.tenant?.onboarding_complete) {
-      const { data: history } = await supabaseAdmin
-        .from("chat_messages")
-        .select("role,content")
-        .eq("business_id", req.tenant?.id || "00000000-0000-0000-0000-000000000000")
-        .order("created_at")
-        .limit(20);
+      // During onboarding there is no business record yet, so no DB history exists.
+      // Use the conversation history the client sends with every request instead.
+      const clientHistory: { role: "user" | "assistant"; content: string }[] =
+        (req.body.history || []).slice(-20);
 
-      const result = await onboard(history || [], message);
+      const result = await onboard(clientHistory, message);
 
       if (result.complete && result.data) {
         const d = result.data;
