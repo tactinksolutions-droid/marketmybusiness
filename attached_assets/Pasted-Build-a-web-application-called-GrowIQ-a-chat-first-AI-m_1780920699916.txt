@@ -1,0 +1,1215 @@
+Build a web application called GrowIQ — a chat-first AI marketing platform for Indian businesses.
+This prototype is pre-configured for the first client: Zariyaa Zen Garden, a B2C wellness brand based in Bengaluru that sells Zen Garden installations (mindfulness spaces) for homes and institutions.
+
+WHAT YOU ARE BUILDING
+A fully functional marketing platform where a business owner manages all their marketing by chatting with an AI assistant. The experience must feel like texting a smart friend — not configuring software.
+For Zariyaa Zen Garden specifically, the AI must understand:
+
+They sell premium wellness spaces (Zen Gardens, Zen Workspaces, Zen Homes)
+Their customers are wellness-conscious individuals, home owners, and institutions
+Their tone is calm, warm, and mindful — never pushy or salesy
+Their marketing channels: WhatsApp (primary), Instagram, Google My Business
+Their key marketing needs: lead nurturing, Google review collection, Instagram content
+
+
+TECH STACK
+Frontend: React 18 + Vite + TailwindCSS
+Backend: Node.js + Express.js
+Database: Supabase (PostgreSQL) with Row Level Security
+AI: Anthropic Claude API (claude-sonnet-4-20250514)
+Auth: Supabase Auth (email OTP magic link)
+Payments: Razorpay (subscription UI — logic stubbed for now)
+HTTP: axios
+Env: dotenv
+
+FOLDER STRUCTURE
+growiq/
+├── client/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Chat/
+│   │   │   │   ├── ChatWindow.jsx
+│   │   │   │   ├── MessageBubble.jsx
+│   │   │   │   ├── InputBar.jsx
+│   │   │   │   └── TypingIndicator.jsx
+│   │   │   ├── Shared/
+│   │   │   │   ├── ActionCard.jsx
+│   │   │   │   └── CampaignPreview.jsx
+│   │   │   └── Sidebar/
+│   │   │       └── Sidebar.jsx
+│   │   ├── pages/
+│   │   │   ├── LoginPage.jsx
+│   │   │   └── ChatPage.jsx
+│   │   ├── hooks/
+│   │   │   ├── useChat.js
+│   │   │   └── useAuth.js
+│   │   ├── lib/
+│   │   │   ├── supabase.js
+│   │   │   └── api.js
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── index.html
+│   ├── vite.config.js
+│   └── package.json
+│
+├── server/
+│   ├── routes/
+│   │   ├── chat.js
+│   │   ├── campaigns.js
+│   │   ├── contacts.js
+│   │   ├── analytics.js
+│   │   └── business.js
+│   ├── middleware/
+│   │   └── tenantMiddleware.js
+│   ├── services/
+│   │   ├── claudeService.js
+│   │   └── contactService.js
+│   ├── lib/
+│   │   └── supabaseAdmin.js
+│   ├── app.js
+│   └── package.json
+│
+├── supabase/
+│   └── schema.sql
+│
+└── .env.example
+
+DATABASE SCHEMA
+File: supabase/schema.sql
+sqlCREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE businesses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  owner_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  city TEXT NOT NULL,
+  locality TEXT,
+  phone TEXT,
+  language TEXT DEFAULT 'English',
+  plan TEXT DEFAULT 'starter',
+  website_url TEXT DEFAULT 'https://www.zariyaa.in',
+  logo_url TEXT,
+  brand_color TEXT DEFAULT '#4A7C6F',
+  brand_tone TEXT DEFAULT 'calm, warm, mindful',
+  whatsapp_connected BOOLEAN DEFAULT FALSE,
+  gmb_connected BOOLEAN DEFAULT FALSE,
+  instagram_connected BOOLEAN DEFAULT FALSE,
+  onboarding_complete BOOLEAN DEFAULT FALSE,
+  monthly_ad_budget INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE contacts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+  name TEXT,
+  phone TEXT,
+  email TEXT,
+  segment TEXT DEFAULT 'new',
+  interest_level TEXT DEFAULT 'warm',
+  source TEXT DEFAULT 'manual',
+  last_contacted TIMESTAMPTZ,
+  total_interactions INTEGER DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE campaigns (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  channel TEXT NOT NULL DEFAULT 'whatsapp',
+  message_body TEXT NOT NULL,
+  segment TEXT DEFAULT 'all',
+  status TEXT DEFAULT 'draft',
+  campaign_type TEXT DEFAULT 'promotional',
+  scheduled_at TIMESTAMPTZ,
+  sent_at TIMESTAMPTZ,
+  total_sent INTEGER DEFAULT 0,
+  total_delivered INTEGER DEFAULT 0,
+  total_read INTEGER DEFAULT 0,
+  total_clicked INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE chat_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  action_data JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE reviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+  contact_id UUID REFERENCES contacts(id),
+  rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+  review_text TEXT,
+  platform TEXT DEFAULT 'google',
+  status TEXT DEFAULT 'pending',
+  response_draft TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE gmb_posts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+  post_text TEXT NOT NULL,
+  image_url TEXT,
+  status TEXT DEFAULT 'draft',
+  published_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE businesses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gmb_posts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY business_owner_policy ON businesses
+  FOR ALL USING (owner_user_id = auth.uid());
+
+CREATE POLICY contacts_policy ON contacts
+  FOR ALL USING (business_id IN (SELECT id FROM businesses WHERE owner_user_id = auth.uid()));
+
+CREATE POLICY campaigns_policy ON campaigns
+  FOR ALL USING (business_id IN (SELECT id FROM businesses WHERE owner_user_id = auth.uid()));
+
+CREATE POLICY chat_policy ON chat_messages
+  FOR ALL USING (business_id IN (SELECT id FROM businesses WHERE owner_user_id = auth.uid()));
+
+CREATE POLICY reviews_policy ON reviews
+  FOR ALL USING (business_id IN (SELECT id FROM businesses WHERE owner_user_id = auth.uid()));
+
+CREATE POLICY gmb_policy ON gmb_posts
+  FOR ALL USING (business_id IN (SELECT id FROM businesses WHERE owner_user_id = auth.uid()));
+
+CREATE INDEX idx_contacts_business ON contacts(business_id);
+CREATE INDEX idx_campaigns_business ON campaigns(business_id);
+CREATE INDEX idx_chat_business ON chat_messages(business_id, created_at);
+CREATE INDEX idx_reviews_business ON reviews(business_id);
+
+BACKEND
+server/app.js
+javascriptimport express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import chatRoutes from './routes/chat.js';
+import campaignRoutes from './routes/campaigns.js';
+import contactRoutes from './routes/contacts.js';
+import analyticsRoutes from './routes/analytics.js';
+import businessRoutes from './routes/business.js';
+import { tenantMiddleware } from './middleware/tenantMiddleware.js';
+
+dotenv.config();
+const app = express();
+
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+app.use(express.json({ limit: '10mb' }));
+
+app.use('/api/chat', tenantMiddleware, chatRoutes);
+app.use('/api/campaigns', tenantMiddleware, campaignRoutes);
+app.use('/api/contacts', tenantMiddleware, contactRoutes);
+app.use('/api/analytics', tenantMiddleware, analyticsRoutes);
+app.use('/api/business', tenantMiddleware, businessRoutes);
+
+app.get('/health', (req, res) => res.json({ status: 'ok', platform: 'GrowIQ', version: '1.0' }));
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`GrowIQ server running on port ${PORT}`));
+export default app;
+server/middleware/tenantMiddleware.js
+javascriptimport { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+
+export async function tenantMiddleware(req, res, next) {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(403).json({ error: 'Invalid token' });
+
+    const { data: business } = await supabase
+      .from('businesses')
+      .select('*')
+      .eq('owner_user_id', user.id)
+      .single();
+
+    req.user = user;
+    req.tenant = business || null;
+    next();
+  } catch (err) {
+    res.status(500).json({ error: 'Auth error' });
+  }
+}
+server/services/claudeService.js
+javascriptimport Anthropic from '@anthropic-ai/sdk';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+function buildSystemPrompt(business, stats) {
+  const isZariyaa = business.name?.toLowerCase().includes('zariyaa') || 
+                    business.type?.toLowerCase().includes('wellness');
+  
+  const wellnessContext = isZariyaa ? `
+SPECIAL CONTEXT — ZARIYAA ZEN GARDEN:
+This is a wellness brand. Their products are Zen Garden installations — immersive mindfulness spaces for homes, offices, and institutions. Customers are:
+- Wellness-conscious individuals (25-50 years, urban India, high disposable income)
+- Corporates wanting to set up Zen spaces for employees
+- Institutions (hospitals, schools, resorts)
+
+The brand voice is: calm, warm, deeply caring, rooted in ancient wisdom meets modern science. Never pushy. Never salesy. Think of speaking the way a trusted wellness guide would — gentle but inspiring.
+
+Zariyaa's strongest marketing asset is their corporate client list (Flipkart, Amazon, JP Morgan, HPCL, Deloitte, Samsung). Use this as social proof in B2C campaigns.
+
+The purchase journey is considered — customers need to be nurtured over weeks, not days. WhatsApp nurture sequences work better than one-off blasts. Instagram visual content showing calm, beautiful Zen spaces drives aspirational desire.
+
+Review collection from happy clients is their BIGGEST growth lever. Each positive Google review is worth hundreds of thousands in marketing value for a premium wellness brand.
+` : '';
+
+  return `You are the AI marketing assistant for ${business.name}, a ${business.type} in ${business.city}${business.locality ? ', ' + business.locality : ''}, India.
+
+You are a senior marketing consultant — warm, direct, brilliant. You think about what actually grows the business, not what sounds like marketing advice.
+${wellnessContext}
+BUSINESS:
+- Name: ${business.name}
+- Type: ${business.type}  
+- City: ${business.city}
+- Language: ${business.language || 'English'}
+- Plan: ${business.plan}
+- Contacts: ${stats?.contacts || 0}
+- WhatsApp: ${business.whatsapp_connected ? 'connected' : 'not connected'}
+- GMB: ${business.gmb_connected ? 'connected' : 'not connected'}
+- Instagram: ${business.instagram_connected ? 'connected' : 'not connected'}
+- Brand tone: ${business.brand_tone || 'professional'}
+- Website: ${business.website_url || 'not set'}
+
+HOW YOU SPEAK:
+- Match their language. Hindi response for Hindi message. Hinglish is fine.
+- 2-4 lines for most replies. Detailed only for strategy.  
+- Warm and direct. Never say "Great question!" or "I'd be happy to help" — just help.
+- For wellness brands: always calm, inspiring, never pushy. Lead with the transformation, not the product.
+
+WHAT YOU DO:
+CREATE CAMPAIGN: Draft the message immediately. Suggest timing. Ask for approval once.
+VIEW ANALYTICS: Lead with the one key number. Give a plain verdict. One next action.
+GET SUGGESTION: ONE specific suggestion. Why now. Offer to execute.
+CHANNEL NOT CONNECTED: Tell them. Offer to connect. Never fail silently.
+
+For Zariyaa campaigns specifically:
+- WhatsApp messages should feel like a personal note from a wellness guide, not a promotional blast
+- Instagram captions should paint a picture of calm and transformation
+- GMB posts should highlight the science and real stories behind Zen spaces
+- Review requests should be sent 3-5 days after a customer interaction, not immediately
+
+ACTION BLOCKS — when backend execution is needed, end your response with:
+\`\`\`action
+{
+  "intent": "CREATE_CAMPAIGN",
+  "channel": "whatsapp",
+  "segment": "all",
+  "contact_count": ${stats?.contacts || 0},
+  "message_draft": "message here",
+  "scheduled_time": null,
+  "status": "awaiting_approval",
+  "campaign_name": "Campaign Name",
+  "campaign_type": "nurture"
+}
+\`\`\`
+
+Valid intents: CREATE_CAMPAIGN | SCHEDULE_GMB_POST | TRIGGER_REVIEW_REQUEST | GENERATE_INSTAGRAM_CAPTION | CONNECT_CHANNEL | IMPORT_CONTACTS | GENERATE_REPORT
+
+NEVER send a campaign without approval. NEVER ask more than one clarifying question. NEVER end with "Let me know if there's anything else".`;
+}
+
+function parseAction(raw) {
+  const match = raw.match(/```action\n([\s\S]*?)\n```/);
+  const display = raw.replace(/```action[\s\S]*?```/g, '').trim();
+  let action = null;
+  if (match) {
+    try { action = JSON.parse(match[1]); } catch(e) {}
+  }
+  return { display, action };
+}
+
+export async function chat(business, history, message, stats) {
+  const system = buildSystemPrompt(business, stats);
+  const messages = [
+    ...history.map(m => ({ role: m.role, content: m.content })),
+    { role: 'user', content: message }
+  ];
+  const res = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1000,
+    system,
+    messages
+  });
+  return parseAction(res.content[0].text);
+}
+
+export async function onboard(history, message) {
+  const system = `You are setting up a new GrowIQ account. Collect through natural conversation:
+1. Business name
+2. Business type (be specific — "wellness brand", "salon", "restaurant" etc)
+3. City and area
+4. Owner's first name  
+5. WhatsApp number
+6. Preferred language (English/Hindi/Kannada/Tamil/Telugu)
+
+Already collected: ${JSON.stringify(history.filter(m=>m.role==='assistant').slice(-1))}
+
+Rules: One question at a time. Warm and welcoming. First message: "Welcome to GrowIQ! 🌱 I'm going to help set up your account — it takes about 2 minutes. What's the name of your business?"
+
+When ALL 6 are collected, respond with ONLY this JSON:
+{"done":true,"name":"...","type":"...","city":"...","locality":"...","owner":"...","phone":"...","language":"..."}`;
+
+  const res = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 400,
+    system,
+    messages: [
+      ...history.map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: message }
+    ]
+  });
+  const text = res.content[0].text.trim();
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed.done) return { complete: true, data: parsed };
+  } catch(e) {}
+  return { complete: false, message: text };
+}
+server/routes/chat.js
+javascriptimport express from 'express';
+import { chat, onboard } from '../services/claudeService.js';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const router = express.Router();
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+router.post('/', async (req, res) => {
+  const { message } = req.body;
+  if (!message?.trim()) return res.status(400).json({ error: 'Message required' });
+
+  try {
+    // ONBOARDING
+    if (!req.tenant?.onboarding_complete) {
+      const bizId = req.tenant?.id || 'onboarding';
+      const { data: history } = await db.from('chat_messages')
+        .select('role,content').eq('business_id', req.tenant?.id || '00000000-0000-0000-0000-000000000000')
+        .order('created_at').limit(20);
+
+      const result = await onboard(history || [], message);
+
+      if (result.complete) {
+        const { data: biz, error } = await db.from('businesses').insert({
+          owner_user_id: req.user.id,
+          name: result.data.name,
+          type: result.data.type,
+          city: result.data.city,
+          locality: result.data.locality,
+          phone: result.data.phone,
+          language: result.data.language,
+          onboarding_complete: true,
+          brand_tone: result.data.type?.toLowerCase().includes('wellness') ? 
+            'calm, warm, mindful, inspiring' : 'friendly, professional'
+        }).select().single();
+
+        if (error) throw error;
+
+        return res.json({
+          message: `Welcome to GrowIQ, ${result.data.owner}! 🌱 Your account for **${result.data.name}** is ready.\n\nHere's what I can do for you right now:\n• Send a WhatsApp campaign to your customers\n• Create Instagram content\n• Get more Google reviews\n• Post an update on Google My Business\n\nWhat would you like to start with?`,
+          onboarding_complete: true,
+          business: biz
+        });
+      }
+      return res.json({ message: result.message });
+    }
+
+    // MAIN CHAT
+    const biz = req.tenant;
+    const [{ data: history }, { count: contactCount }] = await Promise.all([
+      db.from('chat_messages').select('role,content')
+        .eq('business_id', biz.id).order('created_at').limit(20),
+      db.from('contacts').select('*', { count: 'exact', head: true })
+        .eq('business_id', biz.id)
+    ]);
+
+    await db.from('chat_messages').insert({
+      business_id: biz.id, role: 'user', content: message
+    });
+
+    const { display, action } = await chat(biz, history || [], message, {
+      contacts: contactCount || 0
+    });
+
+    await db.from('chat_messages').insert({
+      business_id: biz.id, role: 'assistant', content: display, action_data: action
+    });
+
+    let actionResult = null;
+    if (action) {
+      actionResult = await executeAction(action, biz, db);
+    }
+
+    res.json({ message: display, action, actionResult });
+
+  } catch (err) {
+    console.error('Chat error:', err.message);
+    res.status(500).json({ error: 'Something went wrong. Try again.' });
+  }
+});
+
+async function executeAction(action, biz, db) {
+  switch (action.intent) {
+    case 'CREATE_CAMPAIGN': {
+      const { data: c } = await db.from('campaigns').insert({
+        business_id: biz.id,
+        name: action.campaign_name || 'New Campaign',
+        channel: action.channel || 'whatsapp',
+        message_body: action.message_draft,
+        segment: action.segment || 'all',
+        status: 'draft',
+        campaign_type: action.campaign_type || 'promotional',
+        scheduled_at: action.scheduled_time || null
+      }).select().single();
+      return { campaign_id: c?.id, status: 'draft_created' };
+    }
+    case 'TRIGGER_REVIEW_REQUEST': {
+      const { data: c } = await db.from('campaigns').insert({
+        business_id: biz.id,
+        name: 'Google Review Request',
+        channel: 'whatsapp',
+        message_body: action.message_draft || `Hi! Thank you for choosing ${biz.name}. We'd love to hear about your experience. Could you share a quick Google review? It means the world to us 🙏 [Review Link]`,
+        status: 'draft',
+        campaign_type: 'review_request'
+      }).select().single();
+      return { campaign_id: c?.id, status: 'review_request_draft_created' };
+    }
+    case 'SCHEDULE_GMB_POST': {
+      const { data: p } = await db.from('gmb_posts').insert({
+        business_id: biz.id,
+        post_text: action.post_text || action.message_draft,
+        status: 'draft'
+      }).select().single();
+      return { post_id: p?.id, status: 'gmb_post_draft_created' };
+    }
+    default:
+      return { status: 'acknowledged', intent: action.intent };
+  }
+}
+
+router.get('/history', async (req, res) => {
+  if (!req.tenant) return res.json({ messages: [] });
+  const { data } = await db.from('chat_messages').select('*')
+    .eq('business_id', req.tenant.id).order('created_at').limit(50);
+  res.json({ messages: data || [] });
+});
+
+export default router;
+server/routes/campaigns.js
+javascriptimport express from 'express';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const router = express.Router();
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+router.get('/', async (req, res) => {
+  const { data } = await db.from('campaigns').select('*')
+    .eq('business_id', req.tenant.id).order('created_at', { ascending: false });
+  res.json({ campaigns: data || [] });
+});
+
+router.post('/:id/approve', async (req, res) => {
+  const { data: campaign } = await db.from('campaigns').select('*')
+    .eq('id', req.params.id).eq('business_id', req.tenant.id).single();
+
+  if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+
+  await db.from('campaigns').update({
+    status: 'sent',
+    sent_at: new Date().toISOString(),
+    total_sent: campaign.total_sent || 0
+  }).eq('id', req.params.id);
+
+  res.json({ success: true, message: `Campaign "${campaign.name}" approved and queued` });
+});
+
+router.delete('/:id', async (req, res) => {
+  await db.from('campaigns').delete()
+    .eq('id', req.params.id).eq('business_id', req.tenant.id);
+  res.json({ success: true });
+});
+
+export default router;
+server/routes/contacts.js
+javascriptimport express from 'express';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const router = express.Router();
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+router.get('/', async (req, res) => {
+  const { data } = await db.from('contacts').select('*')
+    .eq('business_id', req.tenant.id).order('created_at', { ascending: false });
+  const segments = (data || []).reduce((a, c) => {
+    a[c.segment] = (a[c.segment] || 0) + 1; return a;
+  }, {});
+  res.json({ contacts: data || [], total: data?.length || 0, segments });
+});
+
+router.post('/import', async (req, res) => {
+  const { contacts } = req.body;
+  if (!Array.isArray(contacts)) return res.status(400).json({ error: 'Invalid data' });
+
+  const tagged = contacts.map(c => ({
+    ...c,
+    business_id: req.tenant.id,
+    segment: c.last_contacted ? 'warm' : 'new',
+    source: 'import'
+  }));
+
+  const { data, error } = await db.from('contacts')
+    .upsert(tagged, { onConflict: 'business_id,phone', ignoreDuplicates: true })
+    .select();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ imported: data?.length || 0 });
+});
+
+export default router;
+server/routes/analytics.js
+javascriptimport express from 'express';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const router = express.Router();
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+router.get('/summary', async (req, res) => {
+  const bizId = req.tenant.id;
+
+  const [
+    { count: contacts },
+    { count: campaigns },
+    { data: recentCampaigns },
+    { count: reviews },
+    { count: gmbPosts }
+  ] = await Promise.all([
+    db.from('contacts').select('*',{count:'exact',head:true}).eq('business_id', bizId),
+    db.from('campaigns').select('*',{count:'exact',head:true}).eq('business_id', bizId),
+    db.from('campaigns').select('name,status,channel,campaign_type,created_at,total_sent,total_read')
+      .eq('business_id', bizId).order('created_at',{ascending:false}).limit(5),
+    db.from('reviews').select('*',{count:'exact',head:true}).eq('business_id', bizId),
+    db.from('gmb_posts').select('*',{count:'exact',head:true}).eq('business_id', bizId)
+  ]);
+
+  res.json({
+    contacts: contacts || 0,
+    campaigns: campaigns || 0,
+    reviews: reviews || 0,
+    gmbPosts: gmbPosts || 0,
+    recentCampaigns: recentCampaigns || []
+  });
+});
+
+export default router;
+server/routes/business.js
+javascriptimport express from 'express';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const router = express.Router();
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+router.get('/me', async (req, res) => {
+  res.json({ business: req.tenant });
+});
+
+router.patch('/me', async (req, res) => {
+  const allowed = ['language','brand_tone','brand_color','monthly_ad_budget','website_url'];
+  const updates = Object.fromEntries(
+    Object.entries(req.body).filter(([k]) => allowed.includes(k))
+  );
+  const { data } = await db.from('businesses').update(updates)
+    .eq('id', req.tenant.id).select().single();
+  res.json({ business: data });
+});
+
+router.post('/connect/:platform', async (req, res) => {
+  const { platform } = req.params;
+  const validPlatforms = ['whatsapp','gmb','instagram','facebook'];
+  if (!validPlatforms.includes(platform)) return res.status(400).json({ error: 'Invalid platform' });
+
+  const field = `${platform}_connected`;
+  await db.from('businesses').update({ [field]: true }).eq('id', req.tenant.id);
+  res.json({ success: true, platform, message: `${platform} connected successfully` });
+});
+
+export default router;
+server/lib/supabaseAdmin.js
+javascriptimport { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+export const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
+server/package.json
+json{
+  "name": "growiq-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "axios": "^1.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0"
+  }
+}
+
+FRONTEND
+client/src/lib/supabase.js
+javascriptimport { createClient } from '@supabase/supabase-js';
+export const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+client/src/lib/api.js
+javascriptimport axios from 'axios';
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  timeout: 30000
+});
+export default api;
+client/src/hooks/useAuth.js
+javascriptimport { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import api from '../lib/api';
+
+export function useAuth() {
+  const [user, setUser] = useState(null);
+  const [business, setBusiness] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setUser(session.user);
+        api.defaults.headers.common['Authorization'] = `Bearer ${session.access_token}`;
+        fetchBusiness();
+      } else setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+      if (session) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${session.access_token}`;
+        fetchBusiness();
+      } else { setBusiness(null); setLoading(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function fetchBusiness() {
+    try {
+      const { data } = await api.get('/business/me');
+      setBusiness(data.business);
+    } catch { setBusiness(null); }
+    finally { setLoading(false); }
+  }
+
+  return { user, business, loading, refetch: fetchBusiness };
+}
+client/src/hooks/useChat.js
+javascriptimport { useState, useEffect, useCallback, useRef } from 'react';
+import api from '../lib/api';
+
+export function useChat(business) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const bottomRef = useRef(null);
+
+  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  async function loadHistory() {
+    try {
+      const { data } = await api.get('/chat/history');
+      if (data.messages?.length) {
+        setMessages(data.messages.map(m => ({
+          id: m.id, role: m.role, content: m.content,
+          action: m.action_data, time: m.created_at
+        })));
+      } else {
+        setMessages([{
+          id: 'welcome', role: 'assistant', time: new Date().toISOString(),
+          content: business?.onboarding_complete
+            ? `Welcome back! 🌱 What would you like to work on today for ${business?.name || 'your business'}?`
+            : `Welcome to GrowIQ! 🌱 I'm going to help set up your account. It takes about 2 minutes. What's the name of your business?`
+        }]);
+      }
+    } catch(e) { console.error(e); }
+  }
+
+  const send = useCallback(async (text) => {
+    if (!text.trim() || loading) return;
+    const userMsg = { id: Date.now()+'', role:'user', content:text, time:new Date().toISOString() };
+    setMessages(p => [...p, userMsg]);
+    setLoading(true);
+    try {
+      const { data } = await api.post('/chat', { message: text });
+      setMessages(p => [...p, {
+        id: (Date.now()+1)+'', role:'assistant',
+        content: data.message, action: data.action,
+        time: new Date().toISOString()
+      }]);
+      if (data.action?.status === 'draft_created' || data.action?.status?.includes('draft')) {
+        setPendingAction({ ...data.action, campaign_id: data.actionResult?.campaign_id });
+      }
+      if (data.onboarding_complete) window.location.reload();
+    } catch {
+      setMessages(p => [...p, {
+        id: Date.now()+'', role:'assistant',
+        content: 'Something went wrong on my end. Please try again.',
+        time: new Date().toISOString()
+      }]);
+    } finally { setLoading(false); }
+  }, [loading]);
+
+  async function approve(id) {
+    await api.post(`/campaigns/${id}/approve`);
+    setPendingAction(null);
+    send('Confirm the campaign was sent successfully.');
+  }
+
+  return { messages, loading, pendingAction, setPendingAction, send, approve, bottomRef };
+}
+client/src/components/Chat/MessageBubble.jsx
+jsximport React from 'react';
+
+export default function MessageBubble({ message }) {
+  const isUser = message.role === 'user';
+  const text = message.content.replace(/\*\*(.*?)\*\*/g, '$1');
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+      {!isUser && (
+        <div className="w-8 h-8 rounded-full flex-shrink-0 mr-2 mt-1 overflow-hidden bg-green-700 flex items-center justify-center">
+          <span className="text-white text-xs font-bold">G</span>
+        </div>
+      )}
+      <div className={`max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed
+        ${isUser ? 'bg-green-700 text-white rounded-br-sm' : 'bg-gray-100 text-gray-800 rounded-bl-sm'}`}>
+        <p className="whitespace-pre-wrap">{text}</p>
+        <p className={`text-xs mt-1 ${isUser ? 'text-green-200' : 'text-gray-400'}`}>
+          {new Date(message.time).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })}
+        </p>
+      </div>
+    </div>
+  );
+}
+client/src/components/Chat/TypingIndicator.jsx
+jsximport React from 'react';
+export default function TypingIndicator() {
+  return (
+    <div className="flex justify-start mb-3">
+      <div className="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center text-white text-xs font-bold mr-2 flex-shrink-0">G</div>
+      <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-3">
+        <div className="flex gap-1 items-center h-5">
+          {[0,1,2].map(i => (
+            <div key={i} className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+              style={{ animationDelay: `${i*0.15}s` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+client/src/components/Chat/InputBar.jsx
+jsximport React, { useState } from 'react';
+export default function InputBar({ onSend, disabled }) {
+  const [text, setText] = useState('');
+  function submit(e) {
+    e?.preventDefault();
+    if (!text.trim() || disabled) return;
+    onSend(text.trim()); setText('');
+  }
+  return (
+    <form onSubmit={submit} className="border-t border-gray-200 px-4 py-3 flex items-end gap-2 bg-white">
+      <textarea value={text} onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); submit(); }}}
+        disabled={disabled} rows={1} placeholder="Message GrowIQ..."
+        className="flex-1 resize-none rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:opacity-50 max-h-28"
+        style={{ minHeight:'42px' }} />
+      <button type="submit" disabled={disabled || !text.trim()}
+        className="bg-green-700 text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-green-800 disabled:opacity-40 transition-colors flex-shrink-0">
+        Send
+      </button>
+    </form>
+  );
+}
+client/src/components/Shared/ActionCard.jsx
+jsximport React from 'react';
+
+const channelLabel = { whatsapp:'WhatsApp', email:'Email', sms:'SMS', instagram:'Instagram' };
+const typeLabel = { promotional:'Promotional', nurture:'Nurture sequence', review_request:'Review request', gmb_post:'GMB post' };
+
+export default function ActionCard({ action, onApprove, onReject }) {
+  const isReview = action.campaign_type === 'review_request' || action.intent === 'TRIGGER_REVIEW_REQUEST';
+  const accentColor = isReview ? 'amber' : 'green';
+
+  return (
+    <div className={`mx-auto max-w-[88%] border border-${accentColor}-200 rounded-2xl overflow-hidden bg-${accentColor}-50 mb-4`}>
+      <div className={`px-4 py-2.5 bg-${accentColor}-700 flex items-center gap-2`}>
+        <span className="text-white text-xs font-semibold uppercase tracking-wide">
+          {isReview ? '⭐ Review request ready' : '📣 Campaign ready for approval'}
+        </span>
+      </div>
+      <div className="px-4 py-3">
+        <div className="flex gap-3 text-xs text-gray-500 mb-2">
+          <span>Channel: {channelLabel[action.channel] || action.channel}</span>
+          {action.contact_count > 0 && <span>·  {action.contact_count} recipients</span>}
+          {action.campaign_type && <span>· {typeLabel[action.campaign_type]}</span>}
+        </div>
+        <div className="bg-white rounded-xl p-3 border border-gray-100 mb-3">
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{action.message_draft}</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onApprove}
+            className={`flex-1 bg-${accentColor}-700 text-white rounded-xl py-2 text-sm font-medium hover:bg-${accentColor}-800 transition-colors`}>
+            Send it ✓
+          </button>
+          <button onClick={onReject}
+            className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-2 text-sm font-medium hover:bg-gray-50 transition-colors">
+            Edit message
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+client/src/components/Sidebar/Sidebar.jsx
+jsximport React from 'react';
+import { supabase } from '../../lib/supabase';
+
+const nav = [
+  { icon:'💬', label:'Chat', active:true },
+  { icon:'👥', label:'Contacts' },
+  { icon:'📣', label:'Campaigns' },
+  { icon:'⭐', label:'Reviews' },
+  { icon:'📊', label:'Analytics' },
+  { icon:'⚙️', label:'Settings' },
+];
+
+export default function Sidebar({ business }) {
+  return (
+    <aside className="w-52 bg-white border-r border-gray-100 flex flex-col">
+      <div className="px-4 py-5 border-b border-gray-100">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-lg">🌿</div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{business?.name || 'My Business'}</p>
+            <p className="text-xs text-gray-400 capitalize">{business?.plan || 'starter'}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-3 py-3 border-b border-gray-100">
+        <p className="text-xs text-gray-400 px-2 mb-2 font-medium">Channels</p>
+        {[
+          { label:'WhatsApp', connected: business?.whatsapp_connected },
+          { label:'Google My Business', connected: business?.gmb_connected },
+          { label:'Instagram', connected: business?.instagram_connected },
+        ].map(ch => (
+          <div key={ch.label} className="flex items-center gap-2 px-2 py-1">
+            <div className={`w-1.5 h-1.5 rounded-full ${ch.connected ? 'bg-green-500' : 'bg-gray-300'}`} />
+            <span className="text-xs text-gray-500">{ch.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <nav className="flex-1 px-3 py-3 space-y-0.5">
+        {nav.map(item => (
+          <button key={item.label}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors
+              ${item.active ? 'bg-green-50 text-green-800 font-medium' : 'text-gray-500 hover:bg-gray-50'}`}>
+            <span className="text-base">{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="px-4 py-3 border-t border-gray-100">
+        <div className="bg-green-50 rounded-xl p-3 mb-3">
+          <p className="text-xs font-medium text-green-800 mb-1">GrowIQ</p>
+          <p className="text-xs text-green-600">AI marketing assistant</p>
+        </div>
+        <button onClick={() => supabase.auth.signOut()}
+          className="w-full text-left text-xs text-gray-400 hover:text-gray-600 px-1">
+          Sign out
+        </button>
+      </div>
+    </aside>
+  );
+}
+client/src/components/Chat/ChatWindow.jsx
+jsximport React from 'react';
+import MessageBubble from './MessageBubble';
+import InputBar from './InputBar';
+import TypingIndicator from './TypingIndicator';
+import ActionCard from '../Shared/ActionCard';
+import { useChat } from '../../hooks/useChat';
+
+export default function ChatWindow({ business }) {
+  const { messages, loading, pendingAction, setPendingAction, send, approve, bottomRef } = useChat(business);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto px-4 py-5">
+        {messages.map(msg => <MessageBubble key={msg.id} message={msg} />)}
+        {loading && <TypingIndicator />}
+        {pendingAction && (
+          <ActionCard
+            action={pendingAction}
+            onApprove={() => approve(pendingAction.campaign_id)}
+            onReject={() => { setPendingAction(null); send('Let me rewrite that message.'); }}
+          />
+        )}
+        <div ref={bottomRef} />
+      </div>
+      <InputBar onSend={send} disabled={loading} />
+    </div>
+  );
+}
+client/src/pages/LoginPage.jsx
+jsximport React, { useState } from 'react';
+import { supabase } from '../lib/supabase';
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email, options: { emailRedirectTo: window.location.origin }
+    });
+    if (!error) setSent(true);
+    setLoading(false);
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-green-700 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
+            🌿
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900">GrowIQ</h1>
+          <p className="text-gray-500 text-sm mt-1">AI marketing for growing businesses</p>
+        </div>
+
+        {!sent ? (
+          <form onSubmit={handleLogin} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email address</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com" required
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 mb-4" />
+            <button type="submit" disabled={loading}
+              className="w-full bg-green-700 text-white rounded-xl py-2.5 text-sm font-medium hover:bg-green-800 disabled:opacity-50 transition-colors">
+              {loading ? 'Sending...' : 'Continue with email'}
+            </button>
+            <p className="text-center text-xs text-gray-400 mt-4">No password needed — we'll send a magic link</p>
+          </form>
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm text-center">
+            <div className="text-4xl mb-3">📬</div>
+            <h2 className="font-semibold text-gray-900 mb-1">Check your email</h2>
+            <p className="text-sm text-gray-500">Magic link sent to <strong>{email}</strong></p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+client/src/pages/ChatPage.jsx
+jsximport React from 'react';
+import Sidebar from '../components/Sidebar/Sidebar';
+import ChatWindow from '../components/Chat/ChatWindow';
+
+export default function ChatPage({ business }) {
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar business={business} />
+      <main className="flex-1 flex flex-col min-w-0">
+        <header className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center gap-3">
+          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-lg">🌿</div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{business?.name || 'GrowIQ'}</p>
+            <p className="text-xs text-green-600 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse"></span>
+              AI assistant ready
+            </p>
+          </div>
+          <div className="ml-auto text-xs text-gray-400">
+            Powered by GrowIQ
+          </div>
+        </header>
+        <div className="flex-1 overflow-hidden bg-white">
+          <ChatWindow business={business} />
+        </div>
+      </main>
+    </div>
+  );
+}
+client/src/App.jsx
+jsximport React from 'react';
+import { useAuth } from './hooks/useAuth';
+import LoginPage from './pages/LoginPage';
+import ChatPage from './pages/ChatPage';
+
+export default function App() {
+  const { user, business, loading } = useAuth();
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+      <div className="text-3xl animate-pulse">🌿</div>
+      <p className="text-sm text-gray-400">Loading GrowIQ...</p>
+    </div>
+  );
+  return user ? <ChatPage business={business} /> : <LoginPage />;
+}
+client/src/main.jsx
+jsximport React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+client/index.html
+html<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GrowIQ — AI Marketing</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+client/vite.config.js
+javascriptimport { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+export default defineConfig({ plugins: [react()] });
+client/tailwind.config.js
+javascriptexport default {
+  content: ['./index.html', './src/**/*.{js,jsx}'],
+  theme: { extend: {} },
+  plugins: [],
+};
+client/postcss.config.js
+javascriptexport default {
+  plugins: { tailwindcss: {}, autoprefixer: {} }
+};
+client/src/index.css
+css@tailwind base;
+@tailwind components;
+@tailwind utilities;
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+client/package.json
+json{
+  "name": "growiq-client",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "axios": "^1.7.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "vite": "^5.4.0"
+  }
+}
+
+ENVIRONMENT VARIABLES
+.env.example (root — server)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key-here
+SUPABASE_SERVICE_KEY=your-service-role-key-here
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+PORT=3001
+CLIENT_URL=http://localhost:5173
+NODE_ENV=development
+client/.env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_API_URL=http://localhost:3001/api
+
+WHAT TO DO BEFORE RUNNING
+Step 1 — Create Supabase project at supabase.com
+→ Select region: ap-south-1 (Mumbai) — MANDATORY for DPDP compliance
+→ Go to SQL Editor → paste and run the entire schema.sql above
+Step 2 — Get Anthropic API key from console.anthropic.com
+Step 3 — Fill in both .env files with real values
+Step 4 — Install and run:
+In /server: npm install && npm run dev
+In /client: npm install && npm run dev
+
+TEST CHECKLIST — verify in this exact order
+
+App loads at localhost:5173 — green GrowIQ login screen appears
+Enter email → magic link sent
+Click magic link → onboarding chat starts
+Answer 6 questions → "Zariyaa Zen Garden / wellness / Bengaluru / HSR Layout / [phone] / English"
+Business created → main chat loads with green sidebar
+WhatsApp / GMB / Instagram show as "not connected" in sidebar
+Type: "Send a WhatsApp to my customers about our Zen Garden homes collection"
+→ AI drafts a calm, warm WhatsApp message — NOT a pushy sales blast
+→ Action card appears with "Send it" button
+Click "Send it" → campaign saved as sent
+Type: "How can I get more Google reviews?"
+→ AI explains Review Harvester, offers to create a request message
+Type: "Create an Instagram caption for our Zen Garden at ABB"
+→ AI writes a calm, inspiring caption with relevant hashtags
+
+═══ END ═══
