@@ -16,8 +16,20 @@ router.post("/", tenantMiddleware, async (req: any, res) => {
     if (!req.tenant?.onboarding_complete) {
       // During onboarding there is no business record yet, so no DB history exists.
       // Use the conversation history the client sends with every request instead.
-      const clientHistory: { role: "user" | "assistant"; content: string }[] =
-        (req.body.history || []).slice(-20);
+      // Validate strictly: it is untrusted input that gets fed into the prompt.
+      const rawHistory = Array.isArray(req.body.history) ? req.body.history : [];
+      const clientHistory = rawHistory
+        .filter(
+          (m: any) =>
+            m &&
+            (m.role === "user" || m.role === "assistant") &&
+            typeof m.content === "string"
+        )
+        .map((m: { role: "user" | "assistant"; content: string }) => ({
+          role: m.role,
+          content: m.content.slice(0, 4000),
+        }))
+        .slice(-20);
 
       const result = await onboard(clientHistory, message);
 

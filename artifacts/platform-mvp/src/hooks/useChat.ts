@@ -74,13 +74,17 @@ export function useChat(business: Business | null) {
         content: text,
         time: new Date().toISOString(),
       };
-      setMessages((p) => [...p, userMsg]);
+      let snapshot: ChatMessage[] = [];
+      setMessages((p) => {
+        snapshot = p;
+        return [...p, userMsg];
+      });
       setLoading(true);
       try {
         const { data } = await api.post("/chat", {
-        message: text,
-        history: messages.map((m) => ({ role: m.role, content: m.content })),
-      });
+          message: text,
+          history: snapshot.map((m) => ({ role: m.role, content: m.content })),
+        });
         setMessages((p) => [
           ...p,
           {
