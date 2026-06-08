@@ -1,3 +1,4 @@
 - [GrowIQ onboarding flow](onboarding-flow.md) — chat onboarding uses client-supplied history (no DB row yet) + a summarize-and-confirm step before saving the profile.
 - [Tenant scoping](tenant-scoping.md) — req.tenant is null for authed users with no business row yet; guard before dereferencing req.tenant.id.
 - [Manual schema migrations](manual-schema-migrations.md) — schema.sql is applied by hand; add idempotent ALTERs and always check Supabase {error} on writes (missing columns fail silently).
+- [Contacts CSV import](contacts-csv-import.md) — import dedupes on (business_id, phone) ignoreDuplicates; client omits empty phone so email-only rows don't collide on "".
