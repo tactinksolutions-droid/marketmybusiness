@@ -1,8 +1,9 @@
 import { supabase } from "../../lib/supabase";
 import type { Business } from "../../hooks/useAuth";
+import type { View } from "../../pages/ChatPage";
 
-const nav = [
-  { icon: "💬", label: "Chat", active: true },
+const nav: { icon: string; label: View }[] = [
+  { icon: "💬", label: "Chat" },
   { icon: "👥", label: "Contacts" },
   { icon: "📣", label: "Campaigns" },
   { icon: "⭐", label: "Reviews" },
@@ -10,7 +11,15 @@ const nav = [
   { icon: "⚙️", label: "Settings" },
 ];
 
-export default function Sidebar({ business }: { business: Business | null }) {
+export default function Sidebar({
+  business,
+  active,
+  onSelect,
+}: {
+  business: Business | null;
+  active: View;
+  onSelect: (v: View) => void;
+}) {
   return (
     <aside className="w-52 bg-white border-r border-gray-100 flex flex-col">
       <div className="px-4 py-5 border-b border-gray-100">
@@ -49,8 +58,9 @@ export default function Sidebar({ business }: { business: Business | null }) {
         {nav.map((item) => (
           <button
             key={item.label}
+            onClick={() => onSelect(item.label)}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-              item.active
+              active === item.label
                 ? "bg-green-50 text-green-800 font-medium"
                 : "text-gray-500 hover:bg-gray-50"
             }`}

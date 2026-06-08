@@ -8,7 +8,7 @@ import ChatPage from "./pages/ChatPage";
 const queryClient = new QueryClient();
 
 function Inner() {
-  const { user, business, loading } = useAuth();
+  const { user, business, loading, refetch } = useAuth();
 
   if (loading) {
     return (
@@ -19,7 +19,11 @@ function Inner() {
     );
   }
 
-  return user ? <ChatPage business={business} /> : <LoginPage />;
+  return user ? (
+    <ChatPage business={business} refetchBusiness={refetch} />
+  ) : (
+    <LoginPage />
+  );
 }
 
 export default function App() {
