@@ -32,7 +32,7 @@ export default function InputBar({
         }}
         disabled={disabled}
         rows={1}
-        placeholder="Message GrowIQ..."
+        placeholder="Message MarketMyBusiness..."
         className="flex-1 resize-none rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent disabled:opacity-50 max-h-28"
         style={{ minHeight: "42px" }}
       />

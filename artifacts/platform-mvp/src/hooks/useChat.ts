@@ -56,7 +56,7 @@ export function useChat(business: Business | null) {
             time: new Date().toISOString(),
             content: business?.onboarding_complete
               ? `Welcome back! 🌱 What would you like to work on today for ${business?.name || "your business"}?`
-              : `Welcome to GrowIQ! 🌱 I'm going to help set up your account. It takes about 2 minutes. What's the name of your business?`,
+              : `Welcome to MarketMyBusiness! 🌿 I'm going to help set up your account. It takes about 2 minutes. What's the name of your business?`,
           },
         ]);
       }

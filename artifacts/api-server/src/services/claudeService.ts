@@ -154,7 +154,7 @@ export async function onboard(
   history: ChatMessage[],
   message: string
 ): Promise<{ complete: boolean; message?: string; data?: Record<string, string> }> {
-  const system = `You are setting up a new GrowIQ account. Collect these 6 things through natural conversation, ONE question at a time:
+  const system = `You are setting up a new MarketMyBusiness account. Collect these 6 things through natural conversation, ONE question at a time:
 1. Business name
 2. Business type (be specific — "wellness brand", "salon", "restaurant" etc)
 3. City and area (e.g. "Bengaluru, Indiranagar" — city is the city, area/locality is the neighbourhood)

@@ -56,7 +56,7 @@ router.post("/", tenantMiddleware, async (req: any, res) => {
         if (error) throw error;
 
         res.json({
-          message: `Welcome to GrowIQ, ${d.owner}! 🌱 Your account for **${d.name}** is ready.\n\nHere's what I can do for you right now:\n• Send a WhatsApp campaign to your customers\n• Create Instagram content\n• Get more Google reviews\n• Post an update on Google My Business\n\nWhat would you like to start with?`,
+          message: `Welcome to MarketMyBusiness, ${d.owner}! 🌱 Your account for **${d.name}** is ready.\n\nHere's what I can do for you right now:\n• Send a WhatsApp campaign to your customers\n• Create Instagram content\n• Get more Google reviews\n• Post an update on Google My Business\n\nWhat would you like to start with?`,
           onboarding_complete: true,
           business: biz,
         });

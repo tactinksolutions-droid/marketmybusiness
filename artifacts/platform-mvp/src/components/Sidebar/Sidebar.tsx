@@ -74,7 +74,7 @@ export default function Sidebar({
 
       <div className="px-4 py-3 border-t border-gray-100">
         <div className="bg-green-50 rounded-xl p-3 mb-3">
-          <p className="text-xs font-medium text-green-800 mb-1">GrowIQ</p>
+          <p className="text-xs font-medium text-green-800 mb-1">MarketMyBusiness</p>
           <p className="text-xs text-green-600">AI marketing assistant</p>
         </div>
         <button

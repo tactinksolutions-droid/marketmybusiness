@@ -14,7 +14,7 @@ function Inner() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3">
         <div className="text-3xl animate-pulse">🌿</div>
-        <p className="text-sm text-gray-400">Loading GrowIQ...</p>
+        <p className="text-sm text-gray-400">Loading MarketMyBusiness...</p>
       </div>
     );
   }

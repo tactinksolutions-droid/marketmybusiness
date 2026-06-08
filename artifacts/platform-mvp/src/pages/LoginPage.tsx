@@ -46,7 +46,7 @@ export default function LoginPage() {
           <div className="w-16 h-16 bg-green-700 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
             🌿
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900">GrowIQ</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">MarketMyBusiness</h1>
           <p className="text-gray-500 text-sm mt-1">
             AI marketing for growing businesses
           </p>
@@ -109,7 +109,7 @@ export default function LoginPage() {
           )}
 
           <p className="text-center text-xs text-gray-500 mt-4">
-            {mode === "signin" ? "New to GrowIQ?" : "Already have an account?"}{" "}
+            {mode === "signin" ? "New to MarketMyBusiness?" : "Already have an account?"}{" "}
             <button
               type="button"
               onClick={() => {

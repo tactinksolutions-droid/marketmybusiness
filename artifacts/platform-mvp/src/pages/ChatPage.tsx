@@ -59,14 +59,14 @@ export default function ChatPage({
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-900">
-                  {business?.name || "GrowIQ"}
+                  {business?.name || "MarketMyBusiness"}
                 </p>
                 <p className="text-xs text-green-600 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse" />
                   AI assistant ready
                 </p>
               </div>
-              <div className="ml-auto text-xs text-gray-400">Powered by GrowIQ</div>
+              <div className="ml-auto text-xs text-gray-400">Powered by MarketMyBusiness</div>
             </header>
             <div className="flex-1 overflow-hidden bg-white">
               <ChatWindow business={business} />

@@ -232,7 +232,7 @@ export default function SetupScreen({
             className="bg-green-700 text-white px-8 py-3 rounded-xl text-sm font-medium hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {canProceed
-              ? "Start using GrowIQ →"
+              ? "Start using MarketMyBusiness →"
               : "Connect at least one channel to continue"}
           </button>
           <button
