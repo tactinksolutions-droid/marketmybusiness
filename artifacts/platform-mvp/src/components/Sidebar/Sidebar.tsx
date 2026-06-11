@@ -4,6 +4,7 @@ import type { View } from "../../pages/ChatPage";
 
 const nav: { icon: string; label: View }[] = [
   { icon: "💬", label: "Chat" },
+  { icon: "✍️", label: "Content" },
   { icon: "👥", label: "Contacts" },
   { icon: "📣", label: "Campaigns" },
   { icon: "⭐", label: "Reviews" },

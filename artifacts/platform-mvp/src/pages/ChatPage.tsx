@@ -9,9 +9,11 @@ import ReviewsView from "../components/views/ReviewsView";
 import AnalyticsView from "../components/views/AnalyticsView";
 import SettingsView from "../components/views/SettingsView";
 import IntegrationsView from "../components/views/IntegrationsView";
+import ContentView from "../components/views/ContentView";
 
 export type View =
   | "Chat"
+  | "Content"
   | "Contacts"
   | "Campaigns"
   | "Reviews"
@@ -76,6 +78,9 @@ export default function ChatPage({
           </>
         ) : (
           <div className="flex-1 overflow-auto bg-gray-50">
+            {view === "Content" && (
+              <ContentView business={business} onNavigate={setView} />
+            )}
             {view === "Contacts" && <ContactsView />}
             {view === "Campaigns" && <CampaignsView />}
             {view === "Reviews" && <ReviewsView />}

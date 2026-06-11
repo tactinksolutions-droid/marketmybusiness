@@ -7,6 +7,7 @@ import analyticsRouter from "./analytics";
 import businessRouter from "./business";
 import reviewsRouter from "./reviews";
 import integrationsRouter from "./integrations";
+import contentRouter from "./content";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use("/analytics", analyticsRouter);
 router.use("/business", businessRouter);
 router.use("/reviews", reviewsRouter);
 router.use("/integrations", integrationsRouter);
+router.use("/content", contentRouter);
 
 export default router;
