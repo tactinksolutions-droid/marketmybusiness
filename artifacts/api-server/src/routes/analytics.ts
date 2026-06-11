@@ -13,6 +13,7 @@ router.get("/summary", tenantMiddleware, async (req: any, res) => {
     { data: recentCampaigns },
     { count: reviews },
     { count: gmbPosts },
+    { data: allCampaigns },
   ] = await Promise.all([
     supabaseAdmin
       .from("contacts")
@@ -36,7 +37,26 @@ router.get("/summary", tenantMiddleware, async (req: any, res) => {
       .from("gmb_posts")
       .select("*", { count: "exact", head: true })
       .eq("business_id", bizId),
+    supabaseAdmin
+      .from("campaigns")
+      .select("channel,total_sent,total_read")
+      .eq("business_id", bizId),
   ]);
+
+  // Aggregate real per-channel delivery stats so the analytics view can show
+  // numbers that genuinely match their labels (e.g. WhatsApp "Messages sent").
+  const channelStats: Record<
+    string,
+    { sent: number; read: number; campaigns: number }
+  > = {};
+  for (const c of allCampaigns || []) {
+    const ch = c.channel || "other";
+    const entry = channelStats[ch] || { sent: 0, read: 0, campaigns: 0 };
+    entry.sent += c.total_sent || 0;
+    entry.read += c.total_read || 0;
+    entry.campaigns += 1;
+    channelStats[ch] = entry;
+  }
 
   res.json({
     contacts: contacts || 0,
@@ -44,6 +64,7 @@ router.get("/summary", tenantMiddleware, async (req: any, res) => {
     reviews: reviews || 0,
     gmbPosts: gmbPosts || 0,
     recentCampaigns: recentCampaigns || [],
+    channelStats,
   });
 });
 

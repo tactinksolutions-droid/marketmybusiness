@@ -84,7 +84,7 @@ export default function ChatPage({
             {view === "Contacts" && <ContactsView />}
             {view === "Campaigns" && <CampaignsView />}
             {view === "Reviews" && <ReviewsView />}
-            {view === "Analytics" && <AnalyticsView />}
+            {view === "Analytics" && <AnalyticsView business={business} />}
             {view === "Settings" && (
               <SettingsView business={business} onConnected={refetchBusiness} />
             )}
