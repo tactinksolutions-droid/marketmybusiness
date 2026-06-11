@@ -9,6 +9,7 @@ const nav: { icon: string; label: View }[] = [
   { icon: "⭐", label: "Reviews" },
   { icon: "📊", label: "Analytics" },
   { icon: "⚙️", label: "Settings" },
+  { icon: "🔌", label: "Integrations" },
 ];
 
 export default function Sidebar({

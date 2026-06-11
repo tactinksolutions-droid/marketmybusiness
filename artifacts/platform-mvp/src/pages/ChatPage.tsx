@@ -8,6 +8,7 @@ import CampaignsView from "../components/views/CampaignsView";
 import ReviewsView from "../components/views/ReviewsView";
 import AnalyticsView from "../components/views/AnalyticsView";
 import SettingsView from "../components/views/SettingsView";
+import IntegrationsView from "../components/views/IntegrationsView";
 
 export type View =
   | "Chat"
@@ -15,7 +16,8 @@ export type View =
   | "Campaigns"
   | "Reviews"
   | "Analytics"
-  | "Settings";
+  | "Settings"
+  | "Integrations";
 
 export default function ChatPage({
   business,
@@ -80,6 +82,13 @@ export default function ChatPage({
             {view === "Analytics" && <AnalyticsView />}
             {view === "Settings" && (
               <SettingsView business={business} onConnected={refetchBusiness} />
+            )}
+            {view === "Integrations" && (
+              <IntegrationsView
+                business={business}
+                onConnected={refetchBusiness}
+                onNavigate={setView}
+              />
             )}
           </div>
         )}

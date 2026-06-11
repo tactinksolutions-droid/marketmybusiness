@@ -22,7 +22,21 @@ router.patch("/me", tenantMiddleware, async (req: any, res) => {
   res.json({ business: data });
 });
 
-const validPlatforms = ["whatsapp", "gmb", "instagram", "facebook"];
+const validPlatforms = [
+  "whatsapp",
+  "email",
+  "instagram",
+  "facebook",
+  "linkedin",
+  "gmb",
+  "google_analytics",
+  "google_ads",
+  "gsc",
+  "merchant",
+  "claude",
+  "chatgpt",
+  "gemini",
+];
 
 router.post("/connect/:platform", tenantMiddleware, async (req: any, res) => {
   if (!req.tenant) {

@@ -21,6 +21,12 @@ export interface Business {
   linkedin_connected?: boolean;
   google_ads_connected?: boolean;
   gsc_connected?: boolean;
+  email_connected?: boolean;
+  google_analytics_connected?: boolean;
+  merchant_connected?: boolean;
+  claude_connected?: boolean;
+  chatgpt_connected?: boolean;
+  gemini_connected?: boolean;
   onboarding_complete?: boolean;
 }
 
