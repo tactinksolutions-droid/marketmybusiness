@@ -1,0 +1,78 @@
+MODULE C — REAL EMAIL (BREVO)
+Actual email delivery for campaigns
+and newsletters.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+=== CREATE server/services/emailService.js ===
+
+javascriptimport axios from 'axios';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+
+async function getBrevoKey(businessId) {
+  const { data } = await db.from('businesses')
+    .select('brevo_api_key, name').eq('id', businessId).single();
+  return { key: data?.brevo_api_key || process.env.BREVO_API_KEY, name: data?.name };
+}
+
+export async function sendEmailCampaign(business, campaign, contacts) {
+  const { key, name } = await getBrevoKey(business.id);
+  if (!key) throw new Error('Email not configured');
+
+  const emailContacts = contacts.filter(c => c.email);
+  if (!emailContacts.length) throw new Error('No contacts with email addresses');
+
+  const results = { sent: 0, failed: 0 };
+
+  for (const contact of emailContacts) {
+    try {
+      await axios.post('https://api.brevo.com/v3/smtp/email', {
+        sender: {
+          name: business.name || name,
+          email: process.env.BREVO_SENDER_EMAIL || 'marketing@marketmybusiness.in',
+        },
+        to: [{ email: contact.email, name: contact.name || '' }],
+        subject: campaign.name,
+        htmlContent: `
+          <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #2d3748;">
+            <div style="margin-bottom: 32px;">
+              <img src="${business.logo_url || ''}" alt="${business.name}" style="height: 40px;" />
+            </div>
+            ${campaign.message_body.split('\n').map(line =>
+              `<p style="line-height: 1.8; margin-bottom: 16px; color: #4a5568;">${line}</p>`
+            ).join('')}
+            <div style="margin-top: 40px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
+              <p style="font-size: 12px; color: #a0aec0;">
+                ${business.name} · ${business.city}<br/>
+                <a href="${business.website_url}" style="color: #4A7C6F;">Visit our website</a>
+              </p>
+            </div>
+          </div>
+        `,
+      }, {
+        headers: {
+          'api-key': key,
+          'Content-Type': 'application/json',
+        },
+      });
+      results.sent++;
+      await new Promise(r => setTimeout(r, 100));
+    } catch (err) {
+      results.failed++;
+    }
+  }
+
+  await db.from('campaigns').update({
+    status: 'sent',
+    sent_at: new Date().toISOString(),
+    total_sent: results.sent,
+    total_delivered: results.sent,
+  }).eq('id', campaign.id);
+
+  return results;
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

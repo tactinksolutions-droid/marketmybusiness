@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabaseAdmin } from "../lib/supabase";
 import { tenantMiddleware } from "../middlewares/tenant";
 import { sendCampaign, handleDeliveryWebhook } from "../services/whatsappService";
+import { sendEmailCampaign } from "../services/emailService";
 
 const router = Router();
 
@@ -113,7 +114,37 @@ router.post("/campaigns/:id/send", tenantMiddleware, async (req: any, res) => {
     return;
   }
 
-  // Email, Instagram, Facebook, LinkedIn, etc. are not wired for live sending yet.
+  if (campaign.channel === "email") {
+    const biz = req.tenant;
+    if (!biz.email_connected || !biz.brevo_api_key) {
+      const { error } = await markSimulated(campaign.id, contacts.length);
+      if (error) {
+        req.log.error({ err: error, campaignId: campaign.id }, "Failed to mark campaign sent");
+        res.status(500).json({ error: "Could not send campaign" });
+        return;
+      }
+      res.json({
+        success: true,
+        mode: "simulated",
+        message: `Campaign sent to ${contacts.length} contacts (simulated — add your Brevo API key in Integrations to send real emails).`,
+        stats: { sent: contacts.length, delivered: contacts.length },
+      });
+      return;
+    }
+
+    try {
+      const results = await sendEmailCampaign(biz, campaign, contacts);
+      res.json({ success: true, mode: "live", ...results });
+    } catch (err) {
+      req.log.error({ err, campaignId: campaign.id }, "Email campaign send failed");
+      res.status(502).json({
+        error: err instanceof Error ? err.message : "Email send failed",
+      });
+    }
+    return;
+  }
+
+  // Instagram, Facebook, LinkedIn, etc. are not wired for live sending yet.
   const { error } = await markSimulated(campaign.id, contacts.length);
   if (error) {
     req.log.error({ err: error, campaignId: campaign.id }, "Failed to mark campaign sent");
