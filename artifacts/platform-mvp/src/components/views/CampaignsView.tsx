@@ -46,6 +46,7 @@ export default function CampaignsView() {
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   function load() {
     return api
@@ -61,13 +62,20 @@ export default function CampaignsView() {
     load().finally(() => setLoading(false));
   }, []);
 
-  async function approve(id: string) {
+  async function send(id: string) {
     setBusy(id);
+    setNotice(null);
     try {
-      await api.post(`/campaigns/${id}/approve`);
+      const { data } = await api.post(`/integrations/campaigns/${id}/send`);
+      setNotice(
+        data?.message ||
+          (data?.mode === "live"
+            ? `Sent live to ${data.sent} contact(s)${data.failed ? `, ${data.failed} failed` : ""}.`
+            : "Campaign sent.")
+      );
       await load();
-    } catch {
-      setError(true);
+    } catch (err: any) {
+      setNotice(err?.response?.data?.error || "Couldn't send the campaign. Please try again.");
     } finally {
       setBusy(null);
     }
@@ -119,6 +127,18 @@ export default function CampaignsView() {
           </button>
         ))}
       </div>
+
+      {notice && (
+        <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 flex items-start justify-between gap-3">
+          <span>{notice}</span>
+          <button
+            onClick={() => setNotice(null)}
+            className="text-green-600 hover:text-green-800 text-xs flex-shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-gray-400">Loading campaigns...</p>
@@ -240,7 +260,7 @@ export default function CampaignsView() {
                 {c.status === "draft" && (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => approve(c.id)}
+                      onClick={() => send(c.id)}
                       disabled={busy === c.id}
                       className="flex-1 bg-green-700 text-white text-xs font-medium py-2 rounded-xl hover:bg-green-800 transition-colors disabled:opacity-60"
                     >

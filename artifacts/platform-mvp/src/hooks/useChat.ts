@@ -120,9 +120,14 @@ export function useChat(business: Business | null) {
   );
 
   async function approve(id: string) {
-    await api.post(`/campaigns/${id}/approve`);
-    setPendingAction(null);
-    send("Confirm the campaign was sent successfully.");
+    try {
+      const { data } = await api.post(`/integrations/campaigns/${id}/send`);
+      setPendingAction(null);
+      send(data?.message || "The campaign was sent. Please confirm.");
+    } catch (err: any) {
+      setPendingAction(null);
+      send(err?.response?.data?.error || "The campaign could not be sent.");
+    }
   }
 
   return { messages, loading, pendingAction, setPendingAction, send, approve, bottomRef };

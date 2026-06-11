@@ -310,7 +310,7 @@ function AuthModal({
 
   const configs: Record<
     AuthModalState["type"],
-    { title: string; label: string; placeholder: string; help: string; link: string }
+    { title: string; label: string; placeholder: string; help: string; link: string; note: string }
   > = {
     gupshup: {
       title: "Connect WhatsApp via Gupshup",
@@ -318,6 +318,7 @@ function AuthModal({
       placeholder: "sk-xxxxxxxxxxxxxxxx",
       help: "Get your API key from app.gupshup.io → Settings → API Key",
       link: "https://app.gupshup.io",
+      note: "Your key is saved to your account and used to send WhatsApp campaigns live via Gupshup.",
     },
     brevo: {
       title: "Connect Email via Brevo",
@@ -325,6 +326,7 @@ function AuthModal({
       placeholder: "xkeysib-xxxxxxxxxxxxxxxx",
       help: "Get your API key from app.brevo.com → Settings → API Keys",
       link: "https://app.brevo.com/settings/keys/api",
+      note: "Your key is saved to your account. Email campaigns go live once the email engine is enabled.",
     },
     api_key: {
       title: `Connect ${
@@ -340,6 +342,7 @@ function AuthModal({
         channel.id === "chatgpt"
           ? "https://platform.openai.com/api-keys"
           : "https://aistudio.google.com/app/apikey",
+      note: "Your key is saved to your account for upcoming AI features.",
     },
   };
 
@@ -366,10 +369,7 @@ function AuthModal({
         >
           Get your API key →
         </a>
-        <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-          This enables the channel in your account so the AI can plan for it. Live sending through
-          this provider isn't wired up yet — your key is not stored.
-        </p>
+        <p className="text-xs text-gray-400 mb-4 leading-relaxed">{config.note}</p>
         <div className="flex gap-2">
           <button
             onClick={() => onSubmit(value)}
@@ -461,9 +461,19 @@ export default function IntegrationsView({
     }
   }
 
-  async function handleAuthSubmit(channelId: string) {
+  async function handleAuthSubmit(channelId: string, credential: string) {
     setShowAuthModal(null);
-    await persistConnect(channelId);
+    setConnecting(channelId);
+    setError(null);
+    try {
+      await api.post("/integrations/connect", { channel: channelId, credential });
+      setConnected((prev) => ({ ...prev, [channelId]: true }));
+      onConnected();
+    } catch {
+      setError(`Couldn't connect ${nameFor(channelId)}. Please try again.`);
+    } finally {
+      setConnecting(null);
+    }
   }
 
   return (
@@ -554,7 +564,7 @@ export default function IntegrationsView({
         <AuthModal
           channel={showAuthModal}
           submitting={connecting === showAuthModal.id}
-          onSubmit={() => handleAuthSubmit(showAuthModal.id)}
+          onSubmit={(val) => handleAuthSubmit(showAuthModal.id, val)}
           onClose={() => setShowAuthModal(null)}
         />
       )}

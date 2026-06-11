@@ -13,27 +13,6 @@ router.get("/", tenantMiddleware, async (req: any, res) => {
   res.json({ campaigns: data || [] });
 });
 
-router.post("/:id/approve", tenantMiddleware, async (req: any, res) => {
-  const { data: campaign } = await supabaseAdmin
-    .from("campaigns")
-    .select("*")
-    .eq("id", req.params.id)
-    .eq("business_id", req.tenant.id)
-    .single();
-
-  if (!campaign) {
-    res.status(404).json({ error: "Campaign not found" });
-    return;
-  }
-
-  await supabaseAdmin
-    .from("campaigns")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
-    .eq("id", req.params.id);
-
-  res.json({ success: true, message: `Campaign "${campaign.name}" approved and queued` });
-});
-
 router.delete("/:id", tenantMiddleware, async (req: any, res) => {
   await supabaseAdmin
     .from("campaigns")

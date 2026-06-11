@@ -4,8 +4,17 @@ import { tenantMiddleware } from "../middlewares/tenant";
 
 const router = Router();
 
+const SENSITIVE_FIELDS = ["gupshup_api_key", "brevo_api_key", "openai_api_key", "gemini_api_key"];
+
+function sanitizeBusiness<T extends Record<string, unknown> | null>(b: T): T {
+  if (!b) return b;
+  const copy = { ...b } as Record<string, unknown>;
+  for (const f of SENSITIVE_FIELDS) delete copy[f];
+  return copy as T;
+}
+
 router.get("/me", tenantMiddleware, async (req: any, res) => {
-  res.json({ business: req.tenant });
+  res.json({ business: sanitizeBusiness(req.tenant) });
 });
 
 router.patch("/me", tenantMiddleware, async (req: any, res) => {
@@ -19,7 +28,7 @@ router.patch("/me", tenantMiddleware, async (req: any, res) => {
     .eq("id", req.tenant.id)
     .select()
     .single();
-  res.json({ business: data });
+  res.json({ business: sanitizeBusiness(data) });
 });
 
 const validPlatforms = [
