@@ -59,6 +59,13 @@ ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gupshup_source_number TEXT;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gupshup_app_name TEXT;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gupshup_app_id TEXT;
 
+-- Emovur WhatsApp BSP (alternative to Gupshup). Each template has its own
+-- self-authenticating webhook URL, so emovur_template_url is SECRET (acts as the
+-- API credential) and must never be returned to the client. whatsapp_provider
+-- selects which BSP a business sends through ('gupshup' | 'emovur').
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS emovur_template_url TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS whatsapp_provider TEXT DEFAULT 'gupshup';
+
 CREATE TABLE IF NOT EXISTS contacts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,

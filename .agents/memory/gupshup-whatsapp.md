@@ -24,6 +24,15 @@ description: How real WhatsApp sending works via Gupshup (templates vs free-text
   Real delivery to arbitrary contacts needs a live, business-verified number. Get true delivery status via the
   DLR webhook (`type:"message-event"` → enqueued/sent/delivered/read/**failed** with reason).
 
+- **Emovur (alternative BSP, `whatsapp_provider='emovur'`):** each template has its OWN
+  self-authenticating webhook URL — there is NO separate API key. Send = `POST {url}` with JSON
+  `{ "receiver": "<E164 digits>", "values": {"1": ...} }`; URL prefix is
+  `https://adminapis.backendprod.com/lms_campaign/api/whatsapp/template/{id}/process`. Response is
+  WhatsApp-Cloud-style (`messages[0].id` = real `wamid.*`, `message_status:"accepted"`). The URL IS the
+  credential → store in sensitive col `emovur_template_url`, strip from client, and prefix-check it
+  server-side before fetch (SSRF guard). A live Emovur number delivers to real contacts (no test-number
+  allowlist), unlike the Meta test number we hit on Gupshup. No list-templates API → one URL per template.
+
 **Why:** the user only knows the template NAME; the API needs the UUID, so we look it up via app id.
 **Outstanding:** campaign live-send (`sendCampaign`/`sendWhatsAppMessage`) still uses the deprecated
 free-text path and env-only source/app — not migrated to templates. Convert before relying on cold campaigns.

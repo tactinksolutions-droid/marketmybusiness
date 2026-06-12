@@ -459,9 +459,10 @@ export default function IntegrationsView({
           ))}
         </div>
 
-        {business && connected.whatsapp && (
-          <WhatsAppTester business={business} onSaved={onConnected} />
-        )}
+        {/* The tester is the setup surface for WhatsApp. It is shown whenever a
+            business exists so an Emovur-only owner can connect without first
+            adding a Gupshup key. */}
+        {business && <WhatsAppTester business={business} onSaved={onConnected} />}
 
         <div className="mb-8">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">

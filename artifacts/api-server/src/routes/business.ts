@@ -6,6 +6,7 @@ const router = Router();
 
 const SENSITIVE_FIELDS = [
   "gupshup_api_key",
+  "emovur_template_url",
   "brevo_api_key",
   "openai_api_key",
   "gemini_api_key",

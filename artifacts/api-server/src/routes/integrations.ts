@@ -7,6 +7,8 @@ import {
   handleDeliveryWebhook,
   listApprovedTemplates,
   sendWhatsAppTemplate,
+  sendEmovurTemplate,
+  EMOVUR_TEMPLATE_URL_PREFIX,
 } from "../services/whatsappService";
 import { sendEmailCampaign } from "../services/emailService";
 
@@ -68,6 +70,10 @@ router.post("/whatsapp/settings", tenantMiddleware, async (req: any, res) => {
     return;
   }
 
+  // Saving Gupshup details means this business sends via Gupshup — keep the
+  // provider selection consistent (the switch back from Emovur).
+  update.whatsapp_provider = "gupshup";
+
   const { error } = await supabaseAdmin
     .from("businesses")
     .update(update)
@@ -126,6 +132,63 @@ router.post("/whatsapp/test", tenantMiddleware, async (req: any, res) => {
     req.log.error({ err }, "WhatsApp test send failed");
     res.status(502).json({
       error: err instanceof Error ? err.message : "WhatsApp send failed",
+    });
+  }
+});
+
+// Save the Emovur per-template webhook URL. This URL is the auth credential,
+// so it is stored server-side only and stripped from /business/me responses.
+router.post("/whatsapp/emovur/settings", tenantMiddleware, async (req: any, res) => {
+  if (!req.tenant) {
+    res.status(404).json({ error: "No business profile found" });
+    return;
+  }
+  const { templateUrl } = req.body ?? {};
+  if (typeof templateUrl !== "string" || !templateUrl.trim()) {
+    res.status(400).json({ error: "Paste your Emovur template link" });
+    return;
+  }
+  const trimmed = templateUrl.trim();
+  if (!trimmed.startsWith(EMOVUR_TEMPLATE_URL_PREFIX)) {
+    res.status(400).json({ error: "That doesn't look like an Emovur template link" });
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("businesses")
+    .update({
+      emovur_template_url: trimmed,
+      whatsapp_provider: "emovur",
+      whatsapp_connected: true,
+    })
+    .eq("id", req.tenant.id);
+
+  if (error) {
+    req.log.error({ err: error }, "Failed to save Emovur settings");
+    res.status(500).json({ error: "Could not save Emovur settings" });
+    return;
+  }
+  res.json({ success: true });
+});
+
+// Send the connected Emovur template to one number — tests Emovur on the platform.
+router.post("/whatsapp/emovur/test", tenantMiddleware, async (req: any, res) => {
+  if (!req.tenant) {
+    res.status(404).json({ error: "No business profile found" });
+    return;
+  }
+  const { destination } = req.body ?? {};
+  if (typeof destination !== "string" || !destination.replace(/\D/g, "")) {
+    res.status(400).json({ error: "A valid destination number is required" });
+    return;
+  }
+  try {
+    const result = await sendEmovurTemplate(req.tenant.id, destination);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    req.log.error({ err }, "Emovur test send failed");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "Emovur send failed",
     });
   }
 });

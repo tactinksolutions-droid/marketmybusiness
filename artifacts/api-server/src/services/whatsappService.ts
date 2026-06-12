@@ -138,6 +138,54 @@ export async function sendWhatsAppTemplate(
   }
 }
 
+// ─── Emovur (alternative WhatsApp BSP) ────────────────────────────────────
+// Emovur templates each have a self-authenticating webhook URL. We only ever
+// POST to that exact Emovur host (prefix check below) to prevent the stored
+// URL being abused to make the server call arbitrary endpoints (SSRF).
+export const EMOVUR_TEMPLATE_URL_PREFIX =
+  "https://adminapis.backendprod.com/lms_campaign/api/whatsapp/template/";
+
+async function getEmovurTemplateUrl(businessId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from("businesses")
+    .select("emovur_template_url")
+    .eq("id", businessId)
+    .single();
+  return data?.emovur_template_url || null;
+}
+
+// Send the business's connected Emovur template to one recipient.
+export async function sendEmovurTemplate(
+  businessId: string,
+  destination: string
+): Promise<{ status?: string; messageId?: string }> {
+  const url = await getEmovurTemplateUrl(businessId);
+  if (!url) throw new Error("Emovur not connected — add your template link first");
+  if (!url.startsWith(EMOVUR_TEMPLATE_URL_PREFIX)) {
+    throw new Error("Stored Emovur template link is invalid");
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ receiver: toIndianE164(destination) }),
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Emovur error ${response.status}: ${text}`);
+  }
+  try {
+    const json = JSON.parse(text) as {
+      messages?: { id?: string; message_status?: string }[];
+    };
+    const msg = json.messages?.[0];
+    return { status: msg?.message_status ?? "accepted", messageId: msg?.id };
+  } catch {
+    return { status: "accepted" };
+  }
+}
+
 function toIndianE164(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   return digits.startsWith("91") ? digits : `91${digits}`;
