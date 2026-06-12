@@ -21,6 +21,123 @@ async function getGupshupKey(businessId: string): Promise<string | null> {
   return data?.gupshup_api_key || process.env.GUPSHUP_API_KEY || null;
 }
 
+export interface GupshupConfig {
+  apiKey: string | null;
+  source: string | null;
+  appName: string | null;
+  appId: string | null;
+}
+
+async function getGupshupConfig(businessId: string): Promise<GupshupConfig> {
+  const { data } = await supabaseAdmin
+    .from("businesses")
+    .select("gupshup_api_key, gupshup_source_number, gupshup_app_name, gupshup_app_id")
+    .eq("id", businessId)
+    .single();
+  return {
+    apiKey: data?.gupshup_api_key || process.env.GUPSHUP_API_KEY || null,
+    source: data?.gupshup_source_number || process.env.GUPSHUP_SOURCE_NUMBER || null,
+    appName: data?.gupshup_app_name || process.env.GUPSHUP_APP_NAME || null,
+    appId: data?.gupshup_app_id || null,
+  };
+}
+
+export interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  body: string;
+  templateType: string;
+  paramCount: number;
+}
+
+function countParams(body: string): number {
+  const matches = body.matchAll(/\{\{(\d+)\}\}/g);
+  let max = 0;
+  for (const m of matches) max = Math.max(max, Number(m[1]));
+  return max;
+}
+
+// List APPROVED templates for the business's Gupshup app, resolving the
+// friendly name (elementName, e.g. "whatsapp_test1") to its sending UUID.
+export async function listApprovedTemplates(
+  businessId: string
+): Promise<WhatsAppTemplate[]> {
+  const cfg = await getGupshupConfig(businessId);
+  if (!cfg.apiKey) throw new Error("WhatsApp not connected — add your API key first");
+  if (!cfg.appId) throw new Error("Add your Gupshup App ID to load templates");
+
+  const response = await fetch(
+    `https://api.gupshup.io/wa/app/${encodeURIComponent(cfg.appId)}/template`,
+    { headers: { apikey: cfg.apiKey } }
+  );
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Gupshup error ${response.status}: ${text}`);
+  }
+  const json = (await response.json()) as {
+    templates?: {
+      id: string;
+      elementName: string;
+      data?: string;
+      templateType?: string;
+      status?: string;
+    }[];
+  };
+  return (json.templates ?? [])
+    .filter((t) => t.status === "APPROVED")
+    .map((t) => ({
+      id: t.id,
+      name: t.elementName,
+      body: t.data ?? "",
+      templateType: t.templateType ?? "TEXT",
+      paramCount: countParams(t.data ?? ""),
+    }));
+}
+
+export interface TemplateSendInput {
+  destination: string;
+  templateId: string;
+  params?: string[];
+}
+
+// Send an approved WhatsApp template via Gupshup's active /wa template endpoint.
+export async function sendWhatsAppTemplate(
+  businessId: string,
+  input: TemplateSendInput
+): Promise<{ status?: string; messageId?: string }> {
+  const cfg = await getGupshupConfig(businessId);
+  if (!cfg.apiKey) throw new Error("WhatsApp not connected — add your API key first");
+  if (!cfg.source) throw new Error("Add your WhatsApp sender number first");
+  if (!cfg.appName) throw new Error("Add your Gupshup app name first");
+
+  const body = new URLSearchParams({
+    channel: "whatsapp",
+    source: cfg.source,
+    destination: toIndianE164(input.destination),
+    "src.name": cfg.appName,
+    template: JSON.stringify({ id: input.templateId, params: input.params ?? [] }),
+  });
+
+  const response = await fetch("https://api.gupshup.io/wa/api/v1/template/msg", {
+    method: "POST",
+    headers: {
+      apikey: cfg.apiKey,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Gupshup error ${response.status}: ${text}`);
+  }
+  try {
+    return JSON.parse(text) as { status?: string; messageId?: string };
+  } catch {
+    return { status: "submitted" };
+  }
+}
+
 function toIndianE164(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   return digits.startsWith("91") ? digits : `91${digits}`;

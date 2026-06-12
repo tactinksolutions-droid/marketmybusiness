@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../lib/api";
 import type { Business } from "../../hooks/useAuth";
 import type { View } from "../../pages/ChatPage";
+import WhatsAppTester from "./WhatsAppTester";
 
 type Kind = "key" | "meta" | "soon";
 
@@ -457,6 +458,10 @@ export default function IntegrationsView({
             />
           ))}
         </div>
+
+        {business && connected.whatsapp && (
+          <WhatsAppTester business={business} onSaved={onConnected} />
+        )}
 
         <div className="mb-8">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">

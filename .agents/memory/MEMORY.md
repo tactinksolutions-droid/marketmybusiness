@@ -1,7 +1,3 @@
-- [GrowIQ onboarding flow](onboarding-flow.md) — chat onboarding uses client-supplied history (no DB row yet) + a summarize-and-confirm step before saving the profile.
-- [Tenant scoping](tenant-scoping.md) — req.tenant is null for authed users with no business row yet; guard before dereferencing req.tenant.id.
-- [Manual schema migrations](manual-schema-migrations.md) — schema.sql is applied by hand; add idempotent ALTERs and always check Supabase {error} on writes (missing columns fail silently).
-- [Contacts CSV import](contacts-csv-import.md) — import dedupes on (business_id, phone) ignoreDuplicates; client omits empty phone so email-only rows don't collide on "".
-- [Per-tenant secret handling](per-tenant-secret-handling.md) — business API keys stored plaintext; strip *_api_key from any client response (sanitizeBusiness).
-- [Analytics honesty](analytics-honesty.md) — displayed metric values must match their labels; derive real per-channel stats, never reuse aggregate counts under specific labels.
-- [Connection-state honesty](connection-state-honesty.md) — *_connected requires real proof (key via /integrations/connect or Meta OAuth); no flag-flip /business/connect route.
+- [Gupshup WhatsApp sending](gupshup-whatsapp.md) — templates (not free-text) for business-initiated WhatsApp; needs sender number, app name, app id per business; /sm endpoint deprecated.
+- [Supabase schema is applied by hand](supabase-schema-manual.md) — DATABASE_URL/psql is Replit's built-in PG, NOT Supabase; DDL must be run in the Supabase SQL editor by the user.
+- [Code-execution sandbox has no process.env](code-execution-env.md) — to hit Supabase REST with $SUPABASE_URL/$SUPABASE_SERVICE_KEY, use bash, not the code_execution tool.

@@ -52,6 +52,13 @@ ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gemini_api_key TEXT;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS meta_access_token TEXT;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS meta_user_id TEXT;
 
+-- Gupshup WhatsApp sending config (not secret — needed to address the right
+-- sender/app and to look up approved templates). The API key stays in
+-- gupshup_api_key (sensitive). These three are safe to return to the client.
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gupshup_source_number TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gupshup_app_name TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gupshup_app_id TEXT;
+
 CREATE TABLE IF NOT EXISTS contacts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,

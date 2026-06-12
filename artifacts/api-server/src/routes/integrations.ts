@@ -2,7 +2,12 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import { supabaseAdmin } from "../lib/supabase";
 import { tenantMiddleware } from "../middlewares/tenant";
-import { sendCampaign, handleDeliveryWebhook } from "../services/whatsappService";
+import {
+  sendCampaign,
+  handleDeliveryWebhook,
+  listApprovedTemplates,
+  sendWhatsAppTemplate,
+} from "../services/whatsappService";
 import { sendEmailCampaign } from "../services/emailService";
 
 const router = Router();
@@ -42,6 +47,87 @@ router.post("/connect", tenantMiddleware, async (req: any, res) => {
   }
 
   res.json({ success: true, channel, connected: true });
+});
+
+// Save the non-secret Gupshup sending config (sender number, app name, app id).
+// The API key is set separately via /connect.
+router.post("/whatsapp/settings", tenantMiddleware, async (req: any, res) => {
+  if (!req.tenant) {
+    res.status(404).json({ error: "No business profile found" });
+    return;
+  }
+  const { sourceNumber, appName, appId } = req.body ?? {};
+  const update: Record<string, string | null> = {};
+  if (sourceNumber !== undefined)
+    update.gupshup_source_number = String(sourceNumber).trim() || null;
+  if (appName !== undefined) update.gupshup_app_name = String(appName).trim() || null;
+  if (appId !== undefined) update.gupshup_app_id = String(appId).trim() || null;
+
+  if (Object.keys(update).length === 0) {
+    res.status(400).json({ error: "Nothing to update" });
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("businesses")
+    .update(update)
+    .eq("id", req.tenant.id);
+
+  if (error) {
+    req.log.error({ err: error }, "Failed to save WhatsApp settings");
+    res.status(500).json({ error: "Could not save WhatsApp settings" });
+    return;
+  }
+  res.json({ success: true });
+});
+
+// List the business's APPROVED WhatsApp templates (by friendly name).
+router.get("/whatsapp/templates", tenantMiddleware, async (req: any, res) => {
+  if (!req.tenant) {
+    res.status(404).json({ error: "No business profile found" });
+    return;
+  }
+  try {
+    const templates = await listApprovedTemplates(req.tenant.id);
+    res.json({ templates });
+  } catch (err) {
+    req.log.error({ err }, "Failed to list WhatsApp templates");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "Could not load templates",
+    });
+  }
+});
+
+// Send a single approved template message — used to test WhatsApp on the platform.
+router.post("/whatsapp/test", tenantMiddleware, async (req: any, res) => {
+  if (!req.tenant) {
+    res.status(404).json({ error: "No business profile found" });
+    return;
+  }
+  const { destination, templateId, params } = req.body ?? {};
+  if (typeof destination !== "string" || !destination.replace(/\D/g, "")) {
+    res.status(400).json({ error: "A valid destination number is required" });
+    return;
+  }
+  if (typeof templateId !== "string" || !templateId.trim()) {
+    res.status(400).json({ error: "Pick a template to send" });
+    return;
+  }
+  const cleanParams = Array.isArray(params) ? params.map((p) => String(p)) : [];
+
+  try {
+    const result = await sendWhatsAppTemplate(req.tenant.id, {
+      destination,
+      templateId: templateId.trim(),
+      params: cleanParams,
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    req.log.error({ err }, "WhatsApp test send failed");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "WhatsApp send failed",
+    });
+  }
 });
 
 async function markSimulated(campaignId: string, contactCount: number) {

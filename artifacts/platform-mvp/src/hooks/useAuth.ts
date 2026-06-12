@@ -14,6 +14,9 @@ export interface Business {
   brand_color?: string;
   website_url?: string;
   whatsapp_connected?: boolean;
+  gupshup_source_number?: string | null;
+  gupshup_app_name?: string | null;
+  gupshup_app_id?: string | null;
   gmb_connected?: boolean;
   instagram_connected?: boolean;
   facebook_connected?: boolean;
