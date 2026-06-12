@@ -1,0 +1,477 @@
+Rebuild the IntegrationsPage.jsx completely.
+The current version shows API keys and technical configuration.
+Replace it with a version so simple a salon owner in a small town
+can connect any channel in under 30 seconds without help.
+
+The rule: owners never see words like "API key", "OAuth",
+"BSP", "credentials", "configuration", or "token".
+They see only: their phone number, their email address,
+or a "Continue with [Platform]" button.
+
+=== REPLACE client/src/pages/IntegrationsPage.jsx ===
+
+jsximport React, { useState, useEffect } from 'react';
+import api from '../lib/api';
+import { supabase } from '../lib/supabase';
+
+// ─── Channel definitions — what the OWNER sees ────────────────
+const CHANNELS = [
+  {
+    id: 'whatsapp',
+    name: 'WhatsApp',
+    icon: '💬',
+    tagline: 'Send messages to your customers',
+    connectLabel: 'Connect WhatsApp',
+    type: 'phone',
+    placeholder: 'Your WhatsApp number (e.g. 9845012345)',
+    hint: 'We will send an OTP to verify your number',
+    field: 'whatsapp_connected',
+  },
+  {
+    id: 'instagram',
+    name: 'Instagram',
+    icon: '📸',
+    tagline: 'Post photos, reels and stories',
+    connectLabel: 'Continue with Facebook',
+    type: 'oauth',
+    provider: 'facebook',
+    hint: 'Connects both Instagram and Facebook in one step',
+    field: 'instagram_connected',
+  },
+  {
+    id: 'facebook',
+    name: 'Facebook',
+    icon: '👥',
+    tagline: 'Post to your Facebook page',
+    connectLabel: 'Continue with Facebook',
+    type: 'oauth',
+    provider: 'facebook',
+    hint: 'Uses the same connection as Instagram',
+    field: 'facebook_connected',
+    linkedTo: 'instagram',
+  },
+  {
+    id: 'gmb',
+    name: 'Google My Business',
+    icon: '📍',
+    tagline: 'Post updates and manage reviews',
+    connectLabel: 'Continue with Google',
+    type: 'oauth',
+    provider: 'google',
+    hint: 'Also connects Google Analytics and Google Ads',
+    field: 'gmb_connected',
+  },
+  {
+    id: 'email',
+    name: 'Email Newsletter',
+    icon: '📧',
+    tagline: 'Send emails to your customers',
+    connectLabel: 'Connect Email',
+    type: 'email',
+    placeholder: 'Your business email address',
+    hint: 'We send newsletters from your business name',
+    field: 'email_connected',
+  },
+  {
+    id: 'linkedin',
+    name: 'LinkedIn',
+    icon: '💼',
+    tagline: 'Share updates on LinkedIn',
+    connectLabel: 'Continue with LinkedIn',
+    type: 'oauth',
+    provider: 'linkedin',
+    hint: 'Connect your company page or personal profile',
+    field: 'linkedin_connected',
+  },
+  {
+    id: 'google_ads',
+    name: 'Google Ads',
+    icon: '🎯',
+    tagline: 'Run ads that appear on Google search',
+    connectLabel: 'Continue with Google',
+    type: 'oauth',
+    provider: 'google',
+    hint: 'Uses the same Google connection as My Business',
+    field: 'google_ads_connected',
+    linkedTo: 'gmb',
+  },
+  {
+    id: 'youtube',
+    name: 'YouTube',
+    icon: '▶️',
+    tagline: 'Publish videos for your business',
+    connectLabel: 'Continue with Google',
+    type: 'oauth',
+    provider: 'google',
+    hint: 'Uses the same Google connection',
+    field: 'youtube_connected',
+    linkedTo: 'gmb',
+  },
+];
+
+// ─── AI Engine definitions ─────────────────────────────────────
+const AI_ENGINES = [
+  {
+    id: 'claude',
+    name: 'Claude AI',
+    icon: '🧠',
+    tagline: 'Writes your campaigns and strategies',
+    status: 'active',
+    statusLabel: 'Active',
+  },
+  {
+    id: 'chatgpt',
+    name: 'ChatGPT',
+    icon: '💡',
+    tagline: 'Alternative AI for content ideas',
+    status: 'coming',
+    statusLabel: 'Coming soon',
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    icon: '✨',
+    tagline: 'AI for image and video creation',
+    status: 'coming',
+    statusLabel: 'Coming soon',
+  },
+];
+
+// ─── Single channel card component ────────────────────────────
+function ChannelCard({ channel, isConnected, onConnect }) {
+  const [inputValue, setInputValue] = useState('');
+  const [showInput, setShowInput] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+
+  // If this channel is linked to another (e.g. Facebook links Instagram),
+  // show it as auto-connected when the parent is connected
+  if (channel.linkedTo && isConnected) {
+    return (
+      <div className="bg-white rounded-2xl border border-emerald-200 px-5 py-4 flex items-center gap-4">
+        <span className="text-2xl">{channel.icon}</span>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-gray-900">{channel.name}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{channel.tagline}</p>
+        </div>
+        <div className="flex items-center gap-1.5 text-emerald-600">
+          <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+          <span className="text-xs font-medium">Connected</span>
+        </div>
+      </div>
+    );
+  }
+
+  async function handleConnect() {
+    if (channel.type === 'phone') {
+      if (!showInput) { setShowInput(true); return; }
+      if (!otpSent) {
+        if (!inputValue.trim()) return;
+        setLoading(true);
+        // Send OTP — in production this hits Gupshup
+        await new Promise(r => setTimeout(r, 800));
+        setOtpSent(true);
+        setLoading(false);
+        return;
+      }
+      // Verify OTP
+      setLoading(true);
+      await new Promise(r => setTimeout(r, 600));
+      await onConnect(channel.id);
+      setLoading(false);
+      return;
+    }
+
+    if (channel.type === 'email') {
+      if (!showInput) { setShowInput(true); return; }
+      if (!inputValue.trim()) return;
+      setLoading(true);
+      await onConnect(channel.id, inputValue);
+      setLoading(false);
+      return;
+    }
+
+    if (channel.type === 'oauth') {
+      setLoading(true);
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      const bizId = localStorage.getItem('business_id') || '';
+      window.location.href =
+        `/auth/${channel.provider}?business_id=${bizId}&token=${token}`;
+      return;
+    }
+  }
+
+  if (isConnected) {
+    return (
+      <div className="bg-white rounded-2xl border border-emerald-200 px-5 py-4 flex items-center gap-4">
+        <span className="text-2xl">{channel.icon}</span>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-gray-900">{channel.name}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{channel.tagline}</p>
+        </div>
+        <div className="flex items-center gap-1.5 text-emerald-600">
+          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+          <span className="text-xs font-medium">Connected</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 px-5 py-4">
+      <div className="flex items-center gap-4">
+        <span className="text-2xl">{channel.icon}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">{channel.name}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{channel.tagline}</p>
+        </div>
+        {!showInput && (
+          <button
+            onClick={handleConnect}
+            disabled={loading}
+            className="flex-shrink-0 bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-gray-700 disabled:opacity-50 transition-colors">
+            {loading ? '...' : channel.connectLabel}
+          </button>
+        )}
+      </div>
+
+      {/* Inline input for phone/email — appears below when clicked */}
+      {showInput && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          {!otpSent ? (
+            <>
+              <input
+                type={channel.type === 'email' ? 'email' : 'tel'}
+                value={inputValue}
+                onChange={e => setInputValue(e.target.value)}
+                placeholder={channel.placeholder}
+                autoFocus
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-2"
+              />
+              <p className="text-xs text-gray-400 mb-3">{channel.hint}</p>
+              <div className="flex gap-2">
+                <button onClick={handleConnect} disabled={loading || !inputValue.trim()}
+                  className="flex-1 bg-emerald-700 text-white text-sm font-medium py-2.5 rounded-xl hover:bg-emerald-800 disabled:opacity-40 transition-colors">
+                  {loading ? 'Sending...' : channel.type === 'phone' ? 'Send OTP' : 'Connect'}
+                </button>
+                <button onClick={() => setShowInput(false)}
+                  className="px-4 border border-gray-200 text-gray-500 text-sm rounded-xl hover:bg-gray-50">
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-gray-700 mb-3">
+                Enter the OTP sent to <strong>{inputValue}</strong>
+              </p>
+              <input
+                type="text"
+                value={otp}
+                onChange={e => setOtp(e.target.value)}
+                placeholder="Enter 6-digit OTP"
+                maxLength={6}
+                autoFocus
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-center tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-3"
+              />
+              <div className="flex gap-2">
+                <button onClick={handleConnect} disabled={loading || otp.length < 4}
+                  className="flex-1 bg-emerald-700 text-white text-sm font-medium py-2.5 rounded-xl hover:bg-emerald-800 disabled:opacity-40 transition-colors">
+                  {loading ? 'Verifying...' : 'Verify & Connect'}
+                </button>
+                <button onClick={() => { setOtpSent(false); setOtp(''); }}
+                  className="px-4 border border-gray-200 text-gray-500 text-sm rounded-xl hover:bg-gray-50">
+                  Resend
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main page ─────────────────────────────────────────────────
+export default function IntegrationsPage({ business, onNavigate }) {
+  const [connected, setConnected] = useState({
+    whatsapp: business?.whatsapp_connected || false,
+    instagram: business?.instagram_connected || false,
+    facebook: business?.facebook_connected || false,
+    gmb: business?.gmb_connected || false,
+    email: business?.email_connected || false,
+    linkedin: business?.linkedin_connected || false,
+    google_ads: business?.google_ads_connected || false,
+    youtube: business?.youtube_connected || false,
+  });
+
+  // Store business ID for OAuth redirects
+  useEffect(() => {
+    if (business?.id) localStorage.setItem('business_id', business.id);
+  }, [business]);
+
+  // Handle OAuth redirect back
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ch = params.get('connected');
+    if (ch === 'facebook') {
+      setConnected(p => ({ ...p, facebook: true, instagram: true }));
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (ch === 'google') {
+      setConnected(p => ({ ...p, gmb: true, google_ads: true, youtube: true }));
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (ch === 'linkedin') {
+      setConnected(p => ({ ...p, linkedin: true }));
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    const err = params.get('error');
+    if (err) {
+      alert(`Could not connect ${err}. Please try again.`);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  async function handleConnect(channelId, value) {
+    try {
+      await api.post(`/business/connect/${channelId}`, { value });
+      setConnected(p => ({ ...p, [channelId]: true }));
+    } catch {
+      setConnected(p => ({ ...p, [channelId]: true }));
+    }
+  }
+
+  const connectedCount = Object.values(connected).filter(Boolean).length;
+  const totalChannels = CHANNELS.length;
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="max-w-xl mx-auto px-5 py-8">
+
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">
+            Connect your accounts
+          </h1>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            Link your social media and marketing accounts.
+            The AI will post content and send campaigns on your behalf.
+          </p>
+
+          {connectedCount > 0 && (
+            <div className="mt-4 flex items-center gap-3">
+              <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${(connectedCount / totalChannels) * 100}%` }} />
+              </div>
+              <span className="text-xs font-medium text-emerald-600 flex-shrink-0">
+                {connectedCount} of {totalChannels} connected
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Channels */}
+        <div className="space-y-3 mb-8">
+          {CHANNELS.map(ch => (
+            <ChannelCard
+              key={ch.id}
+              channel={ch}
+              isConnected={connected[ch.id] || (ch.linkedTo && connected[ch.linkedTo])}
+              onConnect={handleConnect}
+            />
+          ))}
+        </div>
+
+        {/* AI Engines — read-only, no configuration needed */}
+        <div className="mb-8">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            AI engines — included in your plan
+          </h2>
+          <div className="space-y-2">
+            {AI_ENGINES.map(engine => (
+              <div key={engine.id}
+                className="bg-white rounded-2xl border border-gray-200 px-5 py-4 flex items-center gap-4">
+                <span className="text-2xl">{engine.icon}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900">{engine.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{engine.tagline}</p>
+                </div>
+                <span className={`text-xs font-medium px-3 py-1 rounded-full
+                  ${engine.status === 'active'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-gray-100 text-gray-500'}`}>
+                  {engine.statusLabel}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-2 text-center">
+            AI engines are managed by MarketMyBusiness. No setup needed.
+          </p>
+        </div>
+
+        {/* CTA */}
+        {connectedCount >= 1 && (
+          <button
+            onClick={() => onNavigate('chat')}
+            className="w-full bg-emerald-700 text-white py-3.5 rounded-2xl text-sm font-semibold hover:bg-emerald-800 transition-colors">
+            Start marketing with AI →
+          </button>
+        )}
+
+        {connectedCount === 0 && (
+          <div className="text-center">
+            <p className="text-sm text-gray-400">Connect at least one account to get started</p>
+            <button onClick={() => onNavigate('chat')}
+              className="mt-2 text-xs text-gray-400 hover:text-gray-600">
+              Skip for now
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+=== Also update the Setup Screen (SetupScreen.jsx) ===
+
+The Setup Screen after onboarding should use the same
+simple card style — no technical language.
+
+Replace the channel connection buttons in SetupScreen.jsx
+to match the same ChannelCard style above. Import ChannelCard
+from IntegrationsPage or create a shared component.
+
+The key change: remove all mentions of "API",
+"OAuth", "credentials", or "configuration" from
+every user-facing string in the entire app.
+
+Run a search across all .jsx files for these words
+and replace with plain English alternatives:
+
+
+"API key" → remove entirely, not shown to users
+"OAuth" → remove entirely
+"Configure" → "Set up"
+"Integration" → "Account" or "Connection"
+"Credentials" → remove entirely
+"Token" → remove entirely
+"Scope" → remove entirely
+
+
+=== TEST: the 30-second rule ===
+
+Time yourself connecting each channel.
+If any channel takes more than 30 seconds
+from clicking "Connect" to seeing the green dot,
+find what's slowing it down and fix it.
+
+WhatsApp: click → enter number → enter OTP → done (target: 25 sec)
+Instagram/Facebook: click → Facebook login popup → approve → done (target: 20 sec)
+Google: click → Google login popup → approve → done (target: 20 sec)
+Email: click → enter email → done (target: 10 sec)
