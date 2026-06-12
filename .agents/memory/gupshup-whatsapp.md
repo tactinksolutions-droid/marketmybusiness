@@ -18,6 +18,12 @@ description: How real WhatsApp sending works via Gupshup (templates vs free-text
   Stored per-business in non-secret columns `gupshup_source_number / gupshup_app_name / gupshup_app_id`
   (api key stays in sensitive `gupshup_api_key`, never returned to client). UI to set + test: WhatsAppTester in IntegrationsView.
 
+- **Test-number gotcha:** a Meta WhatsApp *test* number (e.g. `15559897755`, business entity ends in "Test")
+  only delivers to recipients manually added + OTP-verified in Meta (max 5). Gupshup still returns
+  `202 {status:"submitted"}` for non-allowlisted numbers, but Meta silently drops them — "submitted" ≠ delivered.
+  Real delivery to arbitrary contacts needs a live, business-verified number. Get true delivery status via the
+  DLR webhook (`type:"message-event"` → enqueued/sent/delivered/read/**failed** with reason).
+
 **Why:** the user only knows the template NAME; the API needs the UUID, so we look it up via app id.
 **Outstanding:** campaign live-send (`sendCampaign`/`sendWhatsAppMessage`) still uses the deprecated
 free-text path and env-only source/app — not migrated to templates. Convert before relying on cold campaigns.
