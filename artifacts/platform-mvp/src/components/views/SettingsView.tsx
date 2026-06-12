@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import api from "../../lib/api";
 import ViewHeader from "./ViewHeader";
 import type { Business } from "../../hooks/useAuth";
+import type { View } from "../../pages/ChatPage";
 
 interface Channel {
   id: string;
@@ -14,9 +15,10 @@ interface Channel {
 
 const socialChannels: Channel[] = [
   { id: "whatsapp", name: "WhatsApp Business", icon: "💬", desc: "Send campaigns and automated messages", tier: "starter", connectable: true },
-  { id: "instagram", name: "Instagram", icon: "📸", desc: "Posts, reels, stories, lead ads", tier: "starter", connectable: true },
-  { id: "gmb", name: "Google My Business", icon: "📍", desc: "Local SEO, posts, review management", tier: "starter", connectable: true },
+  { id: "instagram", name: "Instagram", icon: "📸", desc: "Posts, reels, stories", tier: "starter", connectable: true },
   { id: "facebook", name: "Facebook Pages", icon: "👥", desc: "Page posts and lead generation", tier: "starter", connectable: true },
+  { id: "email", name: "Email", icon: "📧", desc: "Newsletters and offers by email", tier: "starter", connectable: true },
+  { id: "gmb", name: "Google My Business", icon: "📍", desc: "Local SEO, posts, review management", tier: "starter", connectable: false },
   { id: "youtube", name: "YouTube", icon: "▶️", desc: "Video publishing and analytics", tier: "growth", connectable: false },
   { id: "linkedin", name: "LinkedIn", icon: "💼", desc: "B2B content and lead generation", tier: "growth", connectable: false },
 ];
@@ -41,18 +43,12 @@ function ChannelRow({
   channel,
   connected,
   plan,
-  onToggle,
-  busy,
 }: {
   channel: Channel;
   connected: boolean;
   plan: string;
-  onToggle: (id: string, newState: boolean) => void;
-  busy: string | null;
 }) {
   const isLocked = channel.tier === "growth" && plan === "starter";
-  const isToggling = busy === channel.id;
-  const on = connected;
 
   return (
     <div
@@ -72,20 +68,17 @@ function ChannelRow({
         </div>
         <p className="text-xs text-gray-500 mt-0.5">{channel.desc}</p>
       </div>
-      <div className="flex items-center gap-3 flex-shrink-0">
-        {on && <span className="text-xs text-green-600 font-medium">Connected</span>}
-        <button
-          onClick={() => !isLocked && channel.connectable && onToggle(channel.id, !connected)}
-          disabled={isLocked || isToggling || !channel.connectable}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-            ${on ? "bg-green-600" : "bg-gray-200"}
-            ${isLocked || !channel.connectable ? "cursor-not-allowed" : "cursor-pointer"}`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform
-              ${on ? "translate-x-6" : "translate-x-1"}`}
-          />
-        </button>
+      <div className="flex-shrink-0">
+        {connected ? (
+          <span className="flex items-center gap-1.5 text-green-600">
+            <span className="w-2 h-2 bg-green-500 rounded-full" />
+            <span className="text-xs font-medium">Connected</span>
+          </span>
+        ) : channel.connectable ? (
+          <span className="text-xs text-gray-400">Not connected</span>
+        ) : (
+          <span className="text-xs text-gray-400">Coming soon</span>
+        )}
       </div>
     </div>
   );
@@ -94,65 +87,20 @@ function ChannelRow({
 export default function SettingsView({
   business,
   onConnected,
+  onNavigate,
 }: {
   business: Business | null;
   onConnected: () => void;
+  onNavigate: (view: View) => void;
 }) {
-  const [connected, setConnected] = useState<Record<string, boolean>>({
-    whatsapp: !!business?.whatsapp_connected,
-    instagram: !!business?.instagram_connected,
-    gmb: !!business?.gmb_connected,
-    facebook: !!business?.facebook_connected,
-    youtube: !!business?.youtube_connected,
-    linkedin: !!business?.linkedin_connected,
-    google_ads: !!business?.google_ads_connected,
-    gsc: !!business?.gsc_connected,
-  });
-  const [busy, setBusy] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setConnected({
-      whatsapp: !!business?.whatsapp_connected,
-      instagram: !!business?.instagram_connected,
-      gmb: !!business?.gmb_connected,
-      facebook: !!business?.facebook_connected,
-      youtube: !!business?.youtube_connected,
-      linkedin: !!business?.linkedin_connected,
-      google_ads: !!business?.google_ads_connected,
-      gsc: !!business?.gsc_connected,
-    });
-  }, [
-    business?.whatsapp_connected,
-    business?.instagram_connected,
-    business?.gmb_connected,
-    business?.facebook_connected,
-    business?.youtube_connected,
-    business?.linkedin_connected,
-    business?.google_ads_connected,
-    business?.gsc_connected,
-  ]);
-
   const plan = business?.plan || "starter";
 
-  async function toggleChannel(channelId: string, newState: boolean) {
-    setBusy(channelId);
-    setError(null);
-    try {
-      if (newState) {
-        await api.post(`/business/connect/${channelId}`);
-      } else {
-        await api.post(`/business/disconnect/${channelId}`);
-      }
-      setConnected((prev) => ({ ...prev, [channelId]: newState }));
-      onConnected();
-    } catch {
-      setError(`Couldn't ${newState ? "connect" : "disconnect"} that channel. Please try again.`);
-    } finally {
-      setBusy(null);
-    }
+  function isConnected(id: string): boolean {
+    return !!(business as Record<string, unknown> | null)?.[`${id}_connected`];
   }
 
   async function saveDetails(e: React.FormEvent<HTMLFormElement>) {
@@ -256,19 +204,23 @@ export default function SettingsView({
           <h2 className="text-sm font-semibold text-gray-900">
             Social media channels
           </h2>
-          <span className="text-xs text-gray-400 capitalize">{plan} plan</span>
+          <button
+            onClick={() => onNavigate("Integrations")}
+            className="text-xs font-medium text-green-700 hover:text-green-800"
+          >
+            Manage connections →
+          </button>
         </div>
         <p className="text-xs text-gray-500 mb-4">
-          Connect channels to enable AI-powered campaign creation and scheduling
+          Connect accounts on the Integrations page to enable AI-powered campaign
+          creation and scheduling
         </p>
         {socialChannels.map((ch) => (
           <ChannelRow
             key={ch.id}
             channel={ch}
-            connected={!!connected[ch.id]}
+            connected={isConnected(ch.id)}
             plan={plan}
-            onToggle={toggleChannel}
-            busy={busy}
           />
         ))}
       </div>
@@ -280,21 +232,18 @@ export default function SettingsView({
             Digital media &amp; analytics
           </h2>
           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-            Growth plan
+            Coming soon
           </span>
         </div>
         <p className="text-xs text-gray-500 mb-4">
-          Ads management, search console, and deep analytics. Upgrade to Growth
-          to unlock.
+          Ads management, search console, and deep analytics are on the way.
         </p>
         {digitalChannels.map((ch) => (
           <ChannelRow
             key={ch.id}
             channel={ch}
-            connected={!!connected[ch.id]}
+            connected={isConnected(ch.id)}
             plan={plan}
-            onToggle={toggleChannel}
-            busy={busy}
           />
         ))}
       </div>

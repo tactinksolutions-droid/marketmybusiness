@@ -4,7 +4,14 @@ import { tenantMiddleware } from "../middlewares/tenant";
 
 const router = Router();
 
-const SENSITIVE_FIELDS = ["gupshup_api_key", "brevo_api_key", "openai_api_key", "gemini_api_key"];
+const SENSITIVE_FIELDS = [
+  "gupshup_api_key",
+  "brevo_api_key",
+  "openai_api_key",
+  "gemini_api_key",
+  "meta_access_token",
+  "meta_user_id",
+];
 
 function sanitizeBusiness<T extends Record<string, unknown> | null>(b: T): T {
   if (!b) return b;
@@ -47,29 +54,10 @@ const validPlatforms = [
   "gemini",
 ];
 
-router.post("/connect/:platform", tenantMiddleware, async (req: any, res) => {
-  if (!req.tenant) {
-    res.status(404).json({ error: "No business profile found" });
-    return;
-  }
-  const { platform } = req.params;
-  if (!validPlatforms.includes(platform)) {
-    res.status(400).json({ error: "Invalid platform" });
-    return;
-  }
-  const field = `${platform}_connected`;
-  const { error } = await supabaseAdmin
-    .from("businesses")
-    .update({ [field]: true })
-    .eq("id", req.tenant.id);
-  if (error) {
-    req.log.error({ err: error, platform }, "Failed to connect platform");
-    res.status(500).json({ error: `Could not connect ${platform}` });
-    return;
-  }
-  res.json({ success: true, platform, message: `${platform} connected successfully` });
-});
-
+// NOTE: there is deliberately no generic "/connect/:platform" route. Marking a
+// channel connected must require real proof — an API key via
+// POST /integrations/connect, or completing the Meta OAuth flow. A plain
+// flag-flip would let any authenticated tenant forge a "connected" status.
 router.post("/disconnect/:platform", tenantMiddleware, async (req: any, res) => {
   if (!req.tenant) {
     res.status(404).json({ error: "No business profile found" });

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import { supabaseAdmin } from "../lib/supabase";
 import { tenantMiddleware } from "../middlewares/tenant";
 import { sendCampaign, handleDeliveryWebhook } from "../services/whatsappService";
@@ -163,6 +164,189 @@ router.post("/campaigns/:id/send", tenantMiddleware, async (req: any, res) => {
 router.post("/webhook/whatsapp", async (req, res) => {
   await handleDeliveryWebhook(req.body);
   res.json({ status: "ok" });
+});
+
+// ─── Meta (Instagram + Facebook) OAuth login ──────────────────────────────
+// Real "Continue with Facebook" flow. Requires a Meta developer app:
+//   FB_APP_ID and FB_APP_SECRET stored as secrets, plus the redirect URI
+//   below registered in the Meta app's Facebook Login settings.
+const META_GRAPH_VERSION = "v21.0";
+const META_SCOPE = "public_profile,email,pages_show_list";
+
+function appDomain(): string | null {
+  return process.env.REPLIT_DOMAINS?.split(",")[0]?.trim() || null;
+}
+
+function metaRedirectUri(): string | null {
+  const domain = appDomain();
+  return domain ? `https://${domain}/api/integrations/meta/callback` : null;
+}
+
+// SESSION_SECRET is required: it signs the OAuth `state` so a forged callback
+// cannot link an attacker's Facebook account to another business (CSRF).
+function metaConfigured(): boolean {
+  return Boolean(
+    process.env.FB_APP_ID &&
+      process.env.FB_APP_SECRET &&
+      process.env.SESSION_SECRET &&
+      appDomain()
+  );
+}
+
+function signState(businessId: string): string {
+  const secret = process.env.SESSION_SECRET as string;
+  const payload = Buffer.from(
+    JSON.stringify({ bid: businessId, exp: Date.now() + 10 * 60 * 1000 })
+  ).toString("base64url");
+  const sig = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
+  return `${payload}.${sig}`;
+}
+
+function verifyState(state: string): string | null {
+  try {
+    const secret = process.env.SESSION_SECRET;
+    if (!secret) return null;
+    const [payload, sig] = state.split(".");
+    if (!payload || !sig) return null;
+    const expected = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
+    const sigBuf = Buffer.from(sig);
+    const expBuf = Buffer.from(expected);
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return null;
+    }
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
+      bid?: string;
+      exp?: number;
+    };
+    if (!data.bid || !data.exp || Date.now() > data.exp) return null;
+    return data.bid;
+  } catch {
+    return null;
+  }
+}
+
+// Begin login: returns the real Facebook authorize URL (or configured:false).
+router.post("/meta/start", tenantMiddleware, async (req: any, res) => {
+  if (!req.tenant) {
+    res.status(404).json({ error: "No business profile found" });
+    return;
+  }
+  if (!metaConfigured()) {
+    res.json({ configured: false });
+    return;
+  }
+  const state = signState(req.tenant.id);
+  const params = new URLSearchParams({
+    client_id: process.env.FB_APP_ID as string,
+    redirect_uri: metaRedirectUri() as string,
+    state,
+    scope: META_SCOPE,
+    response_type: "code",
+  });
+  res.json({
+    configured: true,
+    url: `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${params.toString()}`,
+  });
+});
+
+// Facebook redirects the owner's browser here after they approve (no tenant auth).
+router.get("/meta/callback", async (req: any, res) => {
+  const domain = appDomain();
+  const appHome = domain ? `https://${domain}/` : "/";
+  const back = (q: string) => res.redirect(`${appHome}?${q}`);
+
+  const { code, state, error: fbError } = req.query as Record<string, string | undefined>;
+  if (fbError) {
+    back("meta_error=denied");
+    return;
+  }
+  if (!code || !state || !metaConfigured()) {
+    back("meta_error=invalid");
+    return;
+  }
+  const businessId = verifyState(state);
+  if (!businessId) {
+    back("meta_error=invalid");
+    return;
+  }
+
+  try {
+    const tokenParams = new URLSearchParams({
+      client_id: process.env.FB_APP_ID as string,
+      client_secret: process.env.FB_APP_SECRET as string,
+      redirect_uri: metaRedirectUri() as string,
+      code,
+    });
+    // POST body keeps the app secret out of URLs / intermediary logs.
+    const tokenRes = await fetch(
+      `https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: tokenParams.toString(),
+      }
+    );
+    if (!tokenRes.ok) {
+      req.log.error({ status: tokenRes.status }, "Meta token exchange failed");
+      back("meta_error=failed");
+      return;
+    }
+    const tokenJson = (await tokenRes.json()) as { access_token?: string };
+    const accessToken = tokenJson.access_token;
+    if (!accessToken) {
+      back("meta_error=failed");
+      return;
+    }
+
+    const meRes = await fetch(
+      `https://graph.facebook.com/${META_GRAPH_VERSION}/me?fields=id,name&access_token=${encodeURIComponent(accessToken)}`
+    );
+    const me = meRes.ok ? ((await meRes.json()) as { id?: string }) : {};
+
+    const { error } = await supabaseAdmin
+      .from("businesses")
+      .update({
+        meta_access_token: accessToken,
+        meta_user_id: me.id ?? null,
+        instagram_connected: true,
+        facebook_connected: true,
+      })
+      .eq("id", businessId);
+
+    if (error) {
+      req.log.error({ err: error }, "Failed to save Meta connection");
+      back("meta_error=failed");
+      return;
+    }
+
+    back("connected=facebook");
+  } catch (err) {
+    req.log.error({ err }, "Meta OAuth callback error");
+    back("meta_error=failed");
+  }
+});
+
+// Disconnect Instagram + Facebook and clear the stored Meta token.
+router.post("/meta/disconnect", tenantMiddleware, async (req: any, res) => {
+  if (!req.tenant) {
+    res.status(404).json({ error: "No business profile found" });
+    return;
+  }
+  const { error } = await supabaseAdmin
+    .from("businesses")
+    .update({
+      meta_access_token: null,
+      meta_user_id: null,
+      instagram_connected: false,
+      facebook_connected: false,
+    })
+    .eq("id", req.tenant.id);
+  if (error) {
+    req.log.error({ err: error }, "Failed to disconnect Meta");
+    res.status(500).json({ error: "Could not disconnect" });
+    return;
+  }
+  res.json({ success: true });
 });
 
 export default router;

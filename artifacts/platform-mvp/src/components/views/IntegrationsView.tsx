@@ -3,351 +3,202 @@ import api from "../../lib/api";
 import type { Business } from "../../hooks/useAuth";
 import type { View } from "../../pages/ChatPage";
 
-type AuthType =
-  | "gupshup"
-  | "brevo"
-  | "api_key"
-  | "meta_oauth"
-  | "linkedin_oauth"
-  | "google_oauth";
+type Kind = "key" | "meta" | "soon";
 
-type BadgeColor = "emerald" | "blue" | "amber";
-
-interface IntegrationItem {
+interface Channel {
   id: string;
   name: string;
   icon: string;
-  desc: string;
-  badge: string;
-  badgeColor: BadgeColor;
-  authType: AuthType;
-  capabilities: string[];
+  tagline: string;
+  kind: Kind;
+  connectLabel: string;
+  soonNote?: string;
 }
 
-interface IntegrationGroup {
-  category: string;
-  items: IntegrationItem[];
+interface KeyConfig {
+  title: string;
+  label: string;
+  placeholder: string;
+  help: string;
+  link: string;
+  note: string;
 }
 
-const INTEGRATIONS: IntegrationGroup[] = [
+// What the owner sees — plain language, no jargon.
+const CHANNELS: Channel[] = [
   {
-    category: "Messaging",
-    items: [
-      {
-        id: "whatsapp",
-        name: "WhatsApp Business",
-        icon: "💬",
-        desc: "Send campaigns, automate replies, collect reviews",
-        badge: "REAL API",
-        badgeColor: "emerald",
-        authType: "gupshup",
-        capabilities: ["Campaigns", "Automation", "Review requests", "Delivery tracking"],
-      },
-      {
-        id: "email",
-        name: "Email (Brevo)",
-        icon: "📧",
-        desc: "Newsletters, drip campaigns, transactional email",
-        badge: "REAL API",
-        badgeColor: "emerald",
-        authType: "brevo",
-        capabilities: ["Newsletters", "Drip sequences", "Open tracking", "Click tracking"],
-      },
-    ],
+    id: "whatsapp",
+    name: "WhatsApp",
+    icon: "💬",
+    tagline: "Send messages and campaigns to your customers",
+    kind: "key",
+    connectLabel: "Connect WhatsApp",
   },
   {
-    category: "Social Media",
-    items: [
-      {
-        id: "instagram",
-        name: "Instagram",
-        icon: "📸",
-        desc: "Posts, reels, stories, lead ads",
-        badge: "OAuth",
-        badgeColor: "blue",
-        authType: "meta_oauth",
-        capabilities: ["Feed posts", "Stories", "Reels", "Lead ads", "Analytics"],
-      },
-      {
-        id: "facebook",
-        name: "Facebook Pages",
-        icon: "👥",
-        desc: "Page posts, lead generation, community",
-        badge: "OAuth",
-        badgeColor: "blue",
-        authType: "meta_oauth",
-        capabilities: ["Page posts", "Lead forms", "Boost posts", "Page analytics"],
-      },
-      {
-        id: "linkedin",
-        name: "LinkedIn",
-        icon: "💼",
-        desc: "Company page posts, thought leadership, B2B leads",
-        badge: "OAuth",
-        badgeColor: "blue",
-        authType: "linkedin_oauth",
-        capabilities: ["Company posts", "Article publishing", "Lead gen forms"],
-      },
-    ],
+    id: "instagram",
+    name: "Instagram",
+    icon: "📸",
+    tagline: "Post photos, reels and stories",
+    kind: "meta",
+    connectLabel: "Continue with Facebook",
   },
   {
-    category: "Google",
-    items: [
-      {
-        id: "gmb",
-        name: "Google My Business",
-        icon: "📍",
-        desc: "Posts, reviews, Q&A, local SEO",
-        badge: "REAL API",
-        badgeColor: "emerald",
-        authType: "google_oauth",
-        capabilities: ["Posts", "Review replies", "Q&A", "Photo uploads", "Insights"],
-      },
-      {
-        id: "google_analytics",
-        name: "Google Analytics",
-        icon: "📊",
-        desc: "Website traffic, conversions, audience insights",
-        badge: "OAuth",
-        badgeColor: "blue",
-        authType: "google_oauth",
-        capabilities: ["Traffic reports", "Conversion tracking", "Audience insights"],
-      },
-      {
-        id: "google_ads",
-        name: "Google Ads",
-        icon: "🎯",
-        desc: "Search, display, Performance Max campaigns",
-        badge: "OAuth",
-        badgeColor: "blue",
-        authType: "google_oauth",
-        capabilities: ["Campaign creation", "Budget management", "Keyword research", "ROAS tracking"],
-      },
-      {
-        id: "gsc",
-        name: "Search Console",
-        icon: "🔍",
-        desc: "Organic search performance, keyword rankings",
-        badge: "OAuth",
-        badgeColor: "blue",
-        authType: "google_oauth",
-        capabilities: ["Search rankings", "Click-through rates", "Indexing status"],
-      },
-      {
-        id: "merchant",
-        name: "Merchant Center",
-        icon: "🛒",
-        desc: "Product listings, Shopping ads, inventory",
-        badge: "OAuth",
-        badgeColor: "blue",
-        authType: "google_oauth",
-        capabilities: ["Product feeds", "Shopping campaigns", "Price benchmarks"],
-      },
-    ],
+    id: "facebook",
+    name: "Facebook",
+    icon: "👥",
+    tagline: "Post to your Facebook page",
+    kind: "meta",
+    connectLabel: "Continue with Facebook",
   },
   {
-    category: "AI Engines",
-    items: [
-      {
-        id: "claude",
-        name: "Claude (Anthropic)",
-        icon: "🧠",
-        desc: "Campaign writing, strategy, brand voice",
-        badge: "ACTIVE",
-        badgeColor: "emerald",
-        authType: "api_key",
-        capabilities: ["Campaign copywriting", "Strategy advice", "Brand tone enforcement", "Chat interface"],
-      },
-      {
-        id: "chatgpt",
-        name: "ChatGPT (OpenAI)",
-        icon: "💡",
-        desc: "Content ideation, SEO copy, product descriptions",
-        badge: "API Key",
-        badgeColor: "blue",
-        authType: "api_key",
-        capabilities: ["Content ideas", "SEO writing", "Product descriptions", "Ad copy"],
-      },
-      {
-        id: "gemini",
-        name: "Gemini (Google)",
-        icon: "✨",
-        desc: "Image generation, video creation, multimodal content",
-        badge: "API Key",
-        badgeColor: "blue",
-        authType: "api_key",
-        capabilities: ["Image generation", "Video scripts", "Visual content", "Multilingual"],
-      },
-    ],
+    id: "email",
+    name: "Email",
+    icon: "📧",
+    tagline: "Send newsletters and offers by email",
+    kind: "key",
+    connectLabel: "Connect Email",
+  },
+  {
+    id: "gmb",
+    name: "Google My Business",
+    icon: "📍",
+    tagline: "Post updates and reply to reviews",
+    kind: "soon",
+    connectLabel: "Continue with Google",
+    soonNote: "Google sign-in coming soon",
+  },
+  {
+    id: "google_ads",
+    name: "Google Ads",
+    icon: "🎯",
+    tagline: "Run ads on Google search",
+    kind: "soon",
+    connectLabel: "Continue with Google",
+    soonNote: "Coming soon",
+  },
+  {
+    id: "youtube",
+    name: "YouTube",
+    icon: "▶️",
+    tagline: "Publish videos for your business",
+    kind: "soon",
+    connectLabel: "Continue with Google",
+    soonNote: "Coming soon",
+  },
+  {
+    id: "linkedin",
+    name: "LinkedIn",
+    icon: "💼",
+    tagline: "Share updates on LinkedIn",
+    kind: "soon",
+    connectLabel: "Continue with LinkedIn",
+    soonNote: "Coming soon",
   },
 ];
 
-const ALL_ITEMS = INTEGRATIONS.flatMap((g) => g.items);
-const TOTAL = ALL_ITEMS.length;
-
-const BADGE_COLORS: Record<BadgeColor, string> = {
-  emerald: "bg-emerald-100 text-emerald-700",
-  blue: "bg-blue-100 text-blue-700",
-  amber: "bg-amber-100 text-amber-700",
+const KEY_CONFIGS: Record<string, KeyConfig> = {
+  whatsapp: {
+    title: "Connect WhatsApp",
+    label: "WhatsApp sending key",
+    placeholder: "Paste your key here",
+    help: "From your WhatsApp provider (Gupshup) → Settings → API Key",
+    link: "https://app.gupshup.io",
+    note: "Saved securely to your account and used to send your WhatsApp campaigns. Never shown again.",
+  },
+  email: {
+    title: "Connect Email",
+    label: "Email sending key",
+    placeholder: "Paste your key here",
+    help: "From Brevo → Settings → API Keys",
+    link: "https://app.brevo.com/settings/keys/api",
+    note: "Saved securely to your account and used to send your email campaigns. Never shown again.",
+  },
+  chatgpt: {
+    title: "Connect ChatGPT",
+    label: "ChatGPT key",
+    placeholder: "Paste your key here",
+    help: "From platform.openai.com → API Keys",
+    link: "https://platform.openai.com/api-keys",
+    note: "Saved securely to your account to power extra content tools. Never shown again.",
+  },
+  gemini: {
+    title: "Connect Gemini",
+    label: "Gemini key",
+    placeholder: "Paste your key here",
+    help: "From aistudio.google.com → API Keys",
+    link: "https://aistudio.google.com/app/apikey",
+    note: "Saved securely to your account to power image and video tools. Never shown again.",
+  },
 };
+
+interface AiEngine {
+  id: string;
+  name: string;
+  icon: string;
+  tagline: string;
+  included?: boolean;
+}
+
+const AI_ENGINES: AiEngine[] = [
+  {
+    id: "claude",
+    name: "Claude",
+    icon: "🧠",
+    tagline: "Writes your campaigns, strategy and replies",
+    included: true,
+  },
+  {
+    id: "chatgpt",
+    name: "ChatGPT",
+    icon: "💡",
+    tagline: "Extra content ideas and ad copy",
+  },
+  {
+    id: "gemini",
+    name: "Gemini",
+    icon: "✨",
+    tagline: "Image and video content",
+  },
+];
 
 type ConnectedMap = Record<string, boolean>;
 
+function isConnected(business: Business | null, id: string): boolean {
+  const value = (business as Record<string, unknown> | null)?.[`${id}_connected`];
+  if (id === "claude") return value !== false;
+  return !!value;
+}
+
 function buildConnected(business: Business | null): ConnectedMap {
   const out: ConnectedMap = {};
-  for (const item of ALL_ITEMS) {
-    const value = (business as Record<string, unknown> | null)?.[`${item.id}_connected`];
-    out[item.id] = item.id === "claude" ? value !== false : !!value;
-  }
+  for (const ch of CHANNELS) out[ch.id] = isConnected(business, ch.id);
+  for (const e of AI_ENGINES) out[e.id] = isConnected(business, e.id);
   return out;
 }
 
-function IntegrationCard({
-  item,
-  connected,
-  connecting,
-  onConnect,
-  onDisconnect,
-}: {
-  item: IntegrationItem;
-  connected: boolean;
-  connecting: boolean;
-  onConnect: (id: string, authType: AuthType) => void;
-  onDisconnect: (id: string) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div
-      className={`bg-white rounded-2xl border transition-all duration-200 ${
-        connected ? "border-emerald-200 shadow-sm" : "border-gray-200"
-      } ${expanded ? "shadow-md" : ""}`}
-    >
-      <div className="p-4">
-        <div className="flex items-start gap-3">
-          <span className="text-2xl mt-0.5 flex-shrink-0">{item.icon}</span>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-gray-900">{item.name}</span>
-              <span
-                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE_COLORS[item.badgeColor]}`}
-              >
-                {item.badge}
-              </span>
-              {connected && (
-                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  Connected
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.desc}</p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={() => setExpanded((e) => !e)}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors p-1"
-              aria-label={expanded ? "Collapse" : "Expand"}
-            >
-              {expanded ? "▲" : "▼"}
-            </button>
-            <button
-              onClick={() =>
-                connected ? onDisconnect(item.id) : onConnect(item.id, item.authType)
-              }
-              disabled={connecting}
-              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                connected
-                  ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  : "bg-gray-900 text-white hover:bg-gray-700"
-              } disabled:opacity-50`}
-            >
-              {connecting ? "..." : connected ? "Disconnect" : "Connect"}
-            </button>
-          </div>
-        </div>
-
-        {expanded && (
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <p className="text-xs font-medium text-gray-500 mb-2">Capabilities</p>
-            <div className="flex flex-wrap gap-1.5">
-              {item.capabilities.map((cap) => (
-                <span
-                  key={cap}
-                  className={`text-xs px-2.5 py-1 rounded-full ${
-                    connected ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {cap}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+interface Notice {
+  type: "success" | "info" | "error";
+  msg: string;
 }
 
-interface AuthModalState {
-  id: string;
-  type: "gupshup" | "brevo" | "api_key";
-}
+const NOTICE_STYLES: Record<Notice["type"], string> = {
+  success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  info: "border-blue-200 bg-blue-50 text-blue-800",
+  error: "border-red-200 bg-red-50 text-red-700",
+};
 
-function AuthModal({
-  channel,
+function KeyModal({
+  config,
   submitting,
   onSubmit,
   onClose,
 }: {
-  channel: AuthModalState;
+  config: KeyConfig;
   submitting: boolean;
   onSubmit: (value: string) => void;
   onClose: () => void;
 }) {
   const [value, setValue] = useState("");
-
-  const configs: Record<
-    AuthModalState["type"],
-    { title: string; label: string; placeholder: string; help: string; link: string; note: string }
-  > = {
-    gupshup: {
-      title: "Connect WhatsApp via Gupshup",
-      label: "Gupshup API Key",
-      placeholder: "sk-xxxxxxxxxxxxxxxx",
-      help: "Get your API key from app.gupshup.io → Settings → API Key",
-      link: "https://app.gupshup.io",
-      note: "Your key is saved to your account and used to send WhatsApp campaigns live via Gupshup.",
-    },
-    brevo: {
-      title: "Connect Email via Brevo",
-      label: "Brevo API Key",
-      placeholder: "xkeysib-xxxxxxxxxxxxxxxx",
-      help: "Get your API key from app.brevo.com → Settings → API Keys",
-      link: "https://app.brevo.com/settings/keys/api",
-      note: "Your key is saved to your account. Email campaigns go live once the email engine is enabled.",
-    },
-    api_key: {
-      title: `Connect ${
-        channel.id === "chatgpt" ? "OpenAI" : channel.id === "gemini" ? "Google Gemini" : "API"
-      }`,
-      label: "API Key",
-      placeholder: "sk-xxxxxxxxxxxxxxxx",
-      help:
-        channel.id === "chatgpt"
-          ? "Get from platform.openai.com → API Keys"
-          : "Get from aistudio.google.com → API Keys",
-      link:
-        channel.id === "chatgpt"
-          ? "https://platform.openai.com/api-keys"
-          : "https://aistudio.google.com/app/apikey",
-      note: "Your key is saved to your account for upcoming AI features.",
-    },
-  };
-
-  const config = configs[channel.type] ?? configs.api_key;
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
@@ -359,7 +210,8 @@ function AuthModal({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={config.placeholder}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
+          autoFocus
+          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
         />
         <a
           href={config.link}
@@ -367,7 +219,7 @@ function AuthModal({
           rel="noreferrer"
           className="block text-xs text-emerald-600 hover:underline mb-3"
         >
-          Get your API key →
+          Where do I find this? →
         </a>
         <p className="text-xs text-gray-400 mb-4 leading-relaxed">{config.note}</p>
         <div className="flex gap-2">
@@ -391,6 +243,62 @@ function AuthModal({
   );
 }
 
+function ChannelCard({
+  channel,
+  connected,
+  busy,
+  onConnect,
+  onDisconnect,
+}: {
+  channel: Channel;
+  connected: boolean;
+  busy: boolean;
+  onConnect: (channel: Channel) => void;
+  onDisconnect: (channel: Channel) => void;
+}) {
+  return (
+    <div
+      className={`bg-white rounded-2xl border px-5 py-4 flex items-center gap-4 ${
+        connected ? "border-emerald-200" : "border-gray-200"
+      }`}
+    >
+      <span className="text-2xl flex-shrink-0">{channel.icon}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-900">{channel.name}</p>
+        <p className="text-xs text-gray-400 mt-0.5">{channel.tagline}</p>
+      </div>
+
+      {connected ? (
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="flex items-center gap-1.5 text-emerald-600">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-xs font-medium">Connected</span>
+          </span>
+          <button
+            onClick={() => onDisconnect(channel)}
+            disabled={busy}
+            className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
+          >
+            {busy ? "..." : "Remove"}
+          </button>
+        </div>
+      ) : channel.kind === "soon" ? (
+        <span className="flex-shrink-0 text-xs font-medium text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full">
+          {channel.soonNote ?? "Coming soon"}
+        </span>
+      ) : (
+        <button
+          onClick={() => onConnect(channel)}
+          disabled={busy}
+          className="flex-shrink-0 bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-gray-700 disabled:opacity-50 transition-colors"
+        >
+          {busy ? "..." : channel.connectLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function IntegrationsView({
   business,
   onConnected,
@@ -401,171 +309,225 @@ export default function IntegrationsView({
   onNavigate: (view: View) => void;
 }) {
   const [connected, setConnected] = useState<ConnectedMap>(() => buildConnected(business));
-  const [connecting, setConnecting] = useState<string | null>(null);
-  const [showAuthModal, setShowAuthModal] = useState<AuthModalState | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [keyModal, setKeyModal] = useState<{ id: string; config: KeyConfig } | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   useEffect(() => {
     setConnected(buildConnected(business));
   }, [business]);
 
-  const totalConnected = Object.values(connected).filter(Boolean).length;
-  const pct = Math.round((totalConnected / TOTAL) * 100);
-
-  function nameFor(id: string) {
-    return ALL_ITEMS.find((i) => i.id === id)?.name ?? id;
-  }
-
-  async function persistConnect(channelId: string) {
-    setConnecting(channelId);
-    setError(null);
-    try {
-      await api.post(`/business/connect/${channelId}`);
-      setConnected((prev) => ({ ...prev, [channelId]: true }));
+  // Handle the redirect back from Facebook login.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ok = params.get("connected");
+    const err = params.get("meta_error");
+    if (ok === "facebook") {
+      setNotice({ type: "success", msg: "Facebook & Instagram connected." });
       onConnected();
-    } catch {
-      setError(`Couldn't connect ${nameFor(channelId)}. Please try again.`);
-    } finally {
-      setConnecting(null);
+    } else if (err) {
+      setNotice({
+        type: "error",
+        msg:
+          err === "denied"
+            ? "Facebook login was cancelled. You can try again anytime."
+            : "Couldn't finish connecting Facebook. Please try again.",
+      });
+    }
+    if (ok || err) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const connectedCount = CHANNELS.filter((c) => connected[c.id]).length;
+  const pct = Math.round((connectedCount / CHANNELS.length) * 100);
+
+  function startConnect(channel: Channel) {
+    setNotice(null);
+    if (channel.kind === "key") {
+      const config = KEY_CONFIGS[channel.id];
+      if (config) setKeyModal({ id: channel.id, config });
+      return;
+    }
+    if (channel.kind === "meta") {
+      void startMeta(channel.id);
     }
   }
 
-  function handleConnect(channelId: string, authType: AuthType) {
-    setError(null);
-    if (authType === "gupshup") {
-      setShowAuthModal({ id: channelId, type: "gupshup" });
-      return;
-    }
-    if (authType === "brevo") {
-      setShowAuthModal({ id: channelId, type: "brevo" });
-      return;
-    }
-    if (authType === "api_key") {
-      setShowAuthModal({ id: channelId, type: "api_key" });
-      return;
-    }
-    void persistConnect(channelId);
-  }
-
-  async function handleDisconnect(channelId: string) {
-    setConnecting(channelId);
-    setError(null);
+  async function startMeta(channelId: string) {
+    setBusy(channelId);
+    setNotice(null);
     try {
-      await api.post(`/business/disconnect/${channelId}`);
-      setConnected((prev) => ({ ...prev, [channelId]: false }));
-      onConnected();
+      const { data } = await api.post("/integrations/meta/start");
+      if (data?.configured && data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setNotice({
+        type: "info",
+        msg: "Facebook sign-in is being set up — we'll enable it shortly.",
+      });
     } catch {
-      setError(`Couldn't disconnect ${nameFor(channelId)}. Please try again.`);
+      setNotice({ type: "error", msg: "Couldn't start Facebook login. Please try again." });
     } finally {
-      setConnecting(null);
+      setBusy(null);
     }
   }
 
-  async function handleAuthSubmit(channelId: string, credential: string) {
-    setShowAuthModal(null);
-    setConnecting(channelId);
-    setError(null);
+  async function submitKey(channelId: string, credential: string) {
+    setKeyModal(null);
+    setBusy(channelId);
+    setNotice(null);
     try {
       await api.post("/integrations/connect", { channel: channelId, credential });
       setConnected((prev) => ({ ...prev, [channelId]: true }));
       onConnected();
     } catch {
-      setError(`Couldn't connect ${nameFor(channelId)}. Please try again.`);
+      setNotice({ type: "error", msg: "Couldn't connect that account. Please try again." });
     } finally {
-      setConnecting(null);
+      setBusy(null);
     }
+  }
+
+  async function disconnect(channel: Channel) {
+    setBusy(channel.id);
+    setNotice(null);
+    try {
+      if (channel.kind === "meta") {
+        await api.post("/integrations/meta/disconnect");
+        setConnected((prev) => ({ ...prev, instagram: false, facebook: false }));
+      } else {
+        await api.post(`/business/disconnect/${channel.id}`);
+        setConnected((prev) => ({ ...prev, [channel.id]: false }));
+      }
+      onConnected();
+    } catch {
+      setNotice({ type: "error", msg: "Couldn't remove that account. Please try again." });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function connectEngine(engine: AiEngine) {
+    const config = KEY_CONFIGS[engine.id];
+    if (config) setKeyModal({ id: engine.id, config });
   }
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50">
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="max-w-xl mx-auto px-5 py-8">
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-xl font-semibold text-gray-900">Integrations</h1>
-            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-full px-4 py-1.5">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full" />
-              <span className="text-sm font-medium text-gray-700">
-                {totalConnected} of {TOTAL} connected
-              </span>
-            </div>
-          </div>
-          <p className="text-sm text-gray-500">
-            Connect your brand's channels. The AI will use all connected platforms to create,
-            publish, and measure your marketing automatically.
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Connect your accounts</h1>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            Link your social media and marketing accounts. The AI posts content and sends campaigns
+            on your behalf.
           </p>
 
-          <div className="mt-4 bg-gray-200 rounded-full h-1.5">
-            <div
-              className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-gray-400">
-              Connect more channels for better AI recommendations
-            </span>
-            <span className="text-xs text-emerald-600 font-medium">{pct}% complete</span>
-          </div>
+          {connectedCount > 0 && (
+            <div className="mt-4 flex items-center gap-3">
+              <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                <div
+                  className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="text-xs font-medium text-emerald-600 flex-shrink-0">
+                {connectedCount} of {CHANNELS.length} connected
+              </span>
+            </div>
+          )}
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+        {notice && (
+          <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${NOTICE_STYLES[notice.type]}`}>
+            {notice.msg}
           </div>
         )}
 
-        {INTEGRATIONS.map((group) => (
-          <div key={group.category} className="mb-8">
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                {group.category}
-              </h2>
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-xs text-gray-400">
-                {group.items.filter((i) => connected[i.id]).length}/{group.items.length} connected
-              </span>
-            </div>
-            <div className="space-y-2">
-              {group.items.map((item) => (
-                <IntegrationCard
-                  key={item.id}
-                  item={item}
-                  connected={!!connected[item.id]}
-                  connecting={connecting === item.id}
-                  onConnect={handleConnect}
-                  onDisconnect={handleDisconnect}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+        <div className="space-y-3 mb-8">
+          {CHANNELS.map((channel) => (
+            <ChannelCard
+              key={channel.id}
+              channel={channel}
+              connected={!!connected[channel.id]}
+              busy={busy === channel.id}
+              onConnect={startConnect}
+              onDisconnect={disconnect}
+            />
+          ))}
+        </div>
 
-        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-5 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-gray-900">
-              {totalConnected >= 5 ? "✓ Good integration coverage" : "Connect more channels"}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {totalConnected >= 5
-                ? "Your AI assistant can now manage marketing across all connected channels."
-                : "Connect at least 5 channels for the AI to give cross-channel recommendations."}
-            </p>
+        <div className="mb-8">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            AI engines
+          </h2>
+          <div className="space-y-2">
+            {AI_ENGINES.map((engine) => {
+              const on = !!connected[engine.id];
+              return (
+                <div
+                  key={engine.id}
+                  className="bg-white rounded-2xl border border-gray-200 px-5 py-4 flex items-center gap-4"
+                >
+                  <span className="text-2xl">{engine.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{engine.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{engine.tagline}</p>
+                  </div>
+                  {engine.included ? (
+                    <span className="text-xs font-medium px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                      Included
+                    </span>
+                  ) : on ? (
+                    <span className="flex items-center gap-1.5 text-emerald-600">
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full" />
+                      <span className="text-xs font-medium">Connected</span>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => connectEngine(engine)}
+                      disabled={busy === engine.id}
+                      className="bg-gray-900 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                    >
+                      {busy === engine.id ? "..." : "Connect"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
+          <p className="text-xs text-gray-400 mt-2 text-center">
+            Claude is included in your plan. Add the others only if you have your own account.
+          </p>
+        </div>
+
+        {connectedCount >= 1 ? (
           <button
             onClick={() => onNavigate("Chat")}
-            className="bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-emerald-800 transition-colors flex-shrink-0 ml-4"
+            className="w-full bg-emerald-700 text-white py-3.5 rounded-2xl text-sm font-semibold hover:bg-emerald-800 transition-colors"
           >
-            Go to AI Chat →
+            Start marketing with AI →
           </button>
-        </div>
+        ) : (
+          <div className="text-center">
+            <p className="text-sm text-gray-400">Connect at least one account to get started</p>
+            <button
+              onClick={() => onNavigate("Chat")}
+              className="mt-2 text-xs text-gray-400 hover:text-gray-600"
+            >
+              Skip for now
+            </button>
+          </div>
+        )}
       </div>
 
-      {showAuthModal && (
-        <AuthModal
-          channel={showAuthModal}
-          submitting={connecting === showAuthModal.id}
-          onSubmit={(val) => handleAuthSubmit(showAuthModal.id, val)}
-          onClose={() => setShowAuthModal(null)}
+      {keyModal && (
+        <KeyModal
+          config={keyModal.config}
+          submitting={busy === keyModal.id}
+          onSubmit={(val) => submitKey(keyModal.id, val)}
+          onClose={() => setKeyModal(null)}
         />
       )}
     </div>

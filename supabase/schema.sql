@@ -47,6 +47,11 @@ ALTER TABLE businesses ADD COLUMN IF NOT EXISTS brevo_api_key TEXT;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS openai_api_key TEXT;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS gemini_api_key TEXT;
 
+-- Meta (Instagram + Facebook) OAuth login tokens. Stored server-side only and
+-- stripped from every client response — NEVER returned to the browser.
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS meta_access_token TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS meta_user_id TEXT;
+
 CREATE TABLE IF NOT EXISTS contacts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,

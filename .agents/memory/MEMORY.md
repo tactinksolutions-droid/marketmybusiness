@@ -4,3 +4,4 @@
 - [Contacts CSV import](contacts-csv-import.md) — import dedupes on (business_id, phone) ignoreDuplicates; client omits empty phone so email-only rows don't collide on "".
 - [Per-tenant secret handling](per-tenant-secret-handling.md) — business API keys stored plaintext; strip *_api_key from any client response (sanitizeBusiness).
 - [Analytics honesty](analytics-honesty.md) — displayed metric values must match their labels; derive real per-channel stats, never reuse aggregate counts under specific labels.
+- [Connection-state honesty](connection-state-honesty.md) — *_connected requires real proof (key via /integrations/connect or Meta OAuth); no flag-flip /business/connect route.

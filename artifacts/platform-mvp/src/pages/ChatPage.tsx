@@ -28,7 +28,10 @@ export default function ChatPage({
   business: Business | null;
   refetchBusiness: () => void;
 }) {
-  const [view, setView] = useState<View>("Chat");
+  const [view, setView] = useState<View>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("connected") || params.get("meta_error") ? "Integrations" : "Chat";
+  });
 
   const noChannels =
     !!business &&
@@ -43,9 +46,10 @@ export default function ChatPage({
     return (
       <SetupScreen
         business={business}
-        onComplete={() => {
+        onComplete={(goToIntegrations?: boolean) => {
           refetchBusiness();
           setShowSetup(false);
+          if (goToIntegrations) setView("Integrations");
         }}
       />
     );
@@ -86,7 +90,11 @@ export default function ChatPage({
             {view === "Reviews" && <ReviewsView />}
             {view === "Analytics" && <AnalyticsView business={business} />}
             {view === "Settings" && (
-              <SettingsView business={business} onConnected={refetchBusiness} />
+              <SettingsView
+                business={business}
+                onConnected={refetchBusiness}
+                onNavigate={setView}
+              />
             )}
             {view === "Integrations" && (
               <IntegrationsView
